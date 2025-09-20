@@ -12,6 +12,6 @@ file_path = os.path.join(folder, file)
 if response.status_code == 200:
     with open(file_path, "wb") as f:
         f.write(response.content)
-    print("Download successful")
+    print(f"Download successful to {file_path}")
 else:
     print("Failed to download file")

@@ -26,5 +26,7 @@ df = pd.read_csv(file_path)
 home_away_condition = (df["HomeTeam"] == home_team) & (df["AwayTeam"] == away_team)
 if home_away_condition.any():
     print("yes")
+    # We have to look the last 5 goals played (win, tie, loss), match history between the two clubs
+    # Look at who is playing at home, and if they have been winning or losing their home matches
 else:
     print("The filled in teams have yet to play eachother or are invalid")

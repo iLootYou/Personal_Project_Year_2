@@ -10,6 +10,8 @@ file = "Prem25-26.csv"
 # Full path to where the file will be saved
 file_path = os.path.join(folder, file)
 
+# "wb" for write mode and binary mode so we can write raw bytes which is essential when downloading
+# from web request
 if response.status_code == 200:
     with open(file_path, "wb") as f:
         f.write(response.content)
@@ -23,10 +25,13 @@ away_team = input("Enter the away team: ").strip().title()
 
 df = pd.read_csv(file_path)
 
-home_away_condition = (df["HomeTeam"] == home_team) & (df["AwayTeam"] == away_team)
-if home_away_condition.any():
+# .values gives us an array of the column so we can see if the teams are in that column
+home_team_exists = (home_team in df["HomeTeam"].values) or (home_team in df["AwayTeam"].values)
+away_team_exists = (away_team in df["HomeTeam"].values) or (away_team in df["AwayTeam"].values)
+
+if home_team_exists and away_team_exists:
     print("yes")
-    # We have to look the last 5 goals played (win, tie, loss), match history between the two clubs
+    # We have to look the last 5 matches played (win, tie, loss), match history between the two clubs
     # Look at who is playing at home, and if they have been winning or losing their home matches
 else:
-    print("The filled in teams have yet to play eachother or are invalid")
+    print("The filled in teams are invalid")

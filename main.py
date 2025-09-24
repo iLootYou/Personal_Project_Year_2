@@ -37,10 +37,10 @@ def outcome():
 
     if home_team_exists and away_team_exists:
         # Look the last 5 matches played (win, tie, loss), match history between the two clubs
-        #last_5_matches()
         head2head()
 
         # Look at who is playing at home, and if they have been winning or losing their home matches
+
     else:
         print("The filled in teams are invalid")
 
@@ -62,14 +62,14 @@ def head2head():
     # Merge the dataframes
     all_matches = pd.concat(matches)
 
-    # Coerce to convert invalid dates to NaT instead of errors, formatted the date so it wont parse each element individually
+    # Coerce to convert invalid dates to NaT instead of errors, dayfirst because i cant seem to get the format
     all_matches["Date"] = pd.to_datetime(all_matches["Date"], dayfirst=True, errors='coerce')
 
     # Sort by the date and get the last 5 
     last_5 = all_matches.sort_values(by="Date").tail(5)
   
     # So we can print out the columns we need to see
-    subset = ['Date', 'HomeTeam', 'AwayTeam']
+    subset = ['Date', 'HomeTeam', 'AwayTeam', 'FTR']
 
     print(last_5[subset])
 
@@ -109,7 +109,8 @@ def last_5_matches():
 
 def main():
     #current_season_update()
-    last_5_matches()
+    #last_5_matches()
+    outcome()
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ def outcome():
 
     if home_team_exists and away_team_exists:
         # Look the last 5 matches played (win, tie, loss), match history between the two clubs
-        head2head()
+        #head2head()
 
         # Look at who is playing at home, and if they have been winning or losing their home matches
         home_matches()
@@ -47,6 +47,13 @@ def outcome():
 
 def head2head():
     matches = []
+    H2H_hometeam_wins_home = 0
+    H2H_hometeam_wins_away = 0
+    H2H_awayteam_wins_home = 0
+    H2H_awayteam_wins_away = 0
+    H2H_hometeam_wins = 0
+    H2H_awayteam_wins = 0
+    H2H_draws = 0
 
     # The '*' is to get all the data files that end in .csv so we dont have to specify
     for file in glob.glob(f"{folder}/*.csv"):
@@ -71,11 +78,39 @@ def head2head():
     # So we can print out the columns we need to see
     subset = ['Date', 'HomeTeam', 'AwayTeam', 'FTR']
 
-    print(last_5[subset])
+    # Shape[0] counts rows passing both filters, shape[1] gives columns and shape gives both
+    # Home team wins when playing at home
+    H2H_hometeam_wins_home = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
 
+    # Home team wins when playing away
+    H2H_hometeam_wins_away = last_5[(last_5['AwayTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
+
+    # Total wins of the hometeam
+    H2H_hometeam_wins = H2H_hometeam_wins_home + H2H_hometeam_wins_away
+
+    # Away team wins when playing at home
+    H2H_awayteam_wins_home = last_5[(last_5['HomeTeam'] == away_team) & (last_5['FTR'] == 'H')].shape[0]
+
+    # Away team wins when playing away
+    H2H_awayteam_wins_away = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'A')].shape[0]
+
+    # Total wins of the awayteam
+    H2H_awayteam_wins = H2H_awayteam_wins_home + H2H_awayteam_wins_away
+
+    # Draws count (independent of venue)
+    H2H_draws = (last_5['FTR'] == 'D').sum()
+
+    print(last_5[subset])
+    print(f"Amount of hometeam wins: {H2H_hometeam_wins}")
+    print(f"Amount of draws: {H2H_draws}")
+    print(f"Amount of awayteam wins: {H2H_awayteam_wins}")
+    
 
 def home_matches():
     matches = []
+    home_match_wins = 0
+    home_match_losses = 0
+    home_match_draws = 0
 
     # The '*' is to get all the data files that end in .csv so we dont have to specify
     for file in glob.glob(f"{folder}/*.csv"):
@@ -94,10 +129,22 @@ def home_matches():
     # Sort by the date and get the last 5 
     last_5 = all_home_matches.sort_values(by="Date").tail(5)
 
-        # So we can print out the columns we need to see
+    # So we can print out the columns we need to see
     subset = ['Date', 'HomeTeam','AwayTeam','FTR']
+
+    # Amount of times they win when playing at home
+    home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
+
+    # Amount of times they lose when playing at home
+    home_match_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
+
+    # Amount of they draw when playing at home 
+    home_match_draws = (last_5['FTR'] == 'D').sum()
         
     print(last_5[subset])
+    print(f"Amount of home match wins: {home_match_wins}")
+    print(f"Amount of draws: {home_match_draws}")
+    print(f"Amount of home match losses: {home_match_losses}")
 
 
 def last_5_matches():

@@ -37,10 +37,10 @@ def outcome():
 
     if home_team_exists and away_team_exists:
         # Look the last 5 matches played (win, tie, loss), match history between the two clubs
-        head2head()
+        #head2head()
 
         # Look at who is playing at home, and if they have been winning or losing their home matches
-        #home_matches()
+        home_matches()
     else:
         print("The filled in teams are invalid")
 
@@ -108,6 +108,9 @@ def head2head():
 
 def home_matches():
     matches = []
+    home_match_wins = 0
+    home_match_losses = 0
+    home_match_draws = 0
 
     # The '*' is to get all the data files that end in .csv so we dont have to specify
     for file in glob.glob(f"{folder}/*.csv"):
@@ -128,8 +131,20 @@ def home_matches():
 
     # So we can print out the columns we need to see
     subset = ['Date', 'HomeTeam','AwayTeam','FTR']
+
+    # Amount of times they win when playing at home
+    home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
+
+    # Amount of times they lose when playing at home
+    home_match_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
+
+    # Amount of they draw when playing at home 
+    home_match_draws = (last_5['FTR'] == 'D').sum()
         
     print(last_5[subset])
+    print(f"Amount of home match wins: {home_match_wins}")
+    print(f"Amount of draws: {home_match_draws}")
+    print(f"Amount of home match losses: {home_match_losses}")
 
 
 def last_5_matches():

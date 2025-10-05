@@ -37,7 +37,7 @@ def outcome():
 
     if home_team_exists and away_team_exists:
         # Look the last 5 matches played (win, tie, loss), match history between the two clubs
-        #head2head()
+        head2head()
 
         # Look at who is playing at home, and if they have been winning or losing their home matches
         home_matches()
@@ -104,6 +104,8 @@ def head2head():
     print(f"Amount of hometeam wins: {H2H_hometeam_wins}")
     print(f"Amount of draws: {H2H_draws}")
     print(f"Amount of awayteam wins: {H2H_awayteam_wins}")
+
+    return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws]
     
 
 def home_matches():
@@ -145,6 +147,8 @@ def home_matches():
     print(f"Amount of home match wins: {home_match_wins}")
     print(f"Amount of draws: {home_match_draws}")
     print(f"Amount of home match losses: {home_match_losses}")
+
+    return [home_match_wins, home_match_losses, home_match_draws]
 
 
 def last_5_matches():

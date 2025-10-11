@@ -4,6 +4,9 @@ import glob
 import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 folder = "data/"
 mapping = {'H':0, 'D':1, 'A': 2}
@@ -30,8 +33,8 @@ print(f"Matches loaded: {len(all_data)}")
 def head2head_training(home_team,away_team, all_data, before_date):
     # Filter for h2h matches before a certain date
     h2h_matches = all_data[
-        ((all_data["HomeTeam"] == home_team) | (all_data["AwayTeam"] == home_team)) & 
-        ((all_data["HomeTeam"] == away_team) | (all_data["AwayTeam"] == away_team))
+        (((all_data["HomeTeam"] == home_team) & (all_data["AwayTeam"] == away_team)) |
+         ((all_data["HomeTeam"] == away_team) & (all_data["AwayTeam"] == home_team))) &
         (all_data["Date"] < before_date)]
 
     # Sort by the date and get the last 5 
@@ -86,3 +89,86 @@ def home_matches_training(home_team, all_data, before_date):
 
     return [home_match_wins, home_match_losses, home_match_draws]
 
+# Training dataset
+X_train = []
+y_train = []
+
+# idx = the index row number, match is the actual row data and iterrows() loops through each row in the df
+for idx, match in all_data.iterrows():
+    # To show that we are processing the data each 100 matches
+    if idx % 100 == 0:
+        print(f"Processing match data {idx}/{len(all_data)}")
+    
+    # Extracting the match data
+    home_team = match["HomeTeam"]
+    away_team = match["AwayTeam"]
+    match_date = match["Date"]
+    outcome = match["FTR"]
+
+    # Get the features using data before this match
+    h2h_stats = head2head_training(home_team, away_team, all_data, match_date)
+    home_stats = home_matches_training(home_team, all_data, match_date)
+
+    # Only include matches with historical data
+    if sum(h2h_stats) > 0 or sum(home_stats) > 0:
+        features = h2h_stats + home_stats
+        X_train.append(features)
+        y_train.append(mapping[outcome])
+    
+# Converting to NumPy arrays, because scikit learn requires it 
+X_train = np.array(X_train)
+y_train = np.array(y_train)
+
+print("Training dataset created")
+
+# Split into training and test data 
+X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
+    X_train, y_train, test_size=0.2, random_state=42)
+
+# Training the model
+print("Training the model..")
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train_split, y_train_split)
+
+# Predictions on the set
+y_pred = model.predict(X_test_split)
+"""
+Accuracy: Overall percentage of correct predictions.
+    If accuracy is 50%, the model is right half the time.
+Precision: Of all matches predicted as "Home Win", how many were actually Home Wins?
+    High precision = few false alarms.
+Recall: Of all actual "Home Wins", how many did we predict correctly?
+    High recall = we don't miss many.
+F1-Score: Balance between precision and recall.
+    Good overall measure for each class.
+Confusion Matrix: Shows where the model gets confused
+"""
+
+# Evaluation
+accuracy = model.score(X_test_split, y_test_split)
+print(f"Model accuracy: {accuracy:.2%}")
+
+# Classification
+print("Classification Report")
+print(classification_report(y_test_split, y_pred, target_names=["Home Win", "Draw", "Away Win"]))
+
+# Confusion matrix
+print("Confusion Matrix:")
+cm = confusion_matrix(y_test_split, y_pred)
+print(cm)
+
+# Vizualization of confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=["Home Win", "Draw", "Away Win"],
+            yticklabels=["Home Win", "Draw", "Away Win"])
+plt.ylabel("ACTUAL")
+plt.xlabel("PREDICTED")
+plt.title("Confusion Matrix")
+plt.show()
+
+# Save the model
+#with open('match_predictor.pkl', 'wb') as f:
+#    pickle.dump(model, f)
+
+#print(" Model saved as 'match_predictor.pkl'")

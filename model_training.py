@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import glob
 import pickle
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import seaborn as sns
@@ -128,10 +128,28 @@ X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
 # Training the model
 print("Training the model..")
 model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train_split, y_train_split)
+
+param_grid = {
+    'n_estimators': [50, 100, 200],  # Number of trees
+    'max_depth': [None, 10, 20, 30], # Maximum depth of each tree
+    'min_sample_split': [2, 5, 10],  # Minimum number of samples needed to split node
+    'min_sample_leaf': [1, 2, 4]     # Minimum number of samples needed at leaf node
+}
+
+# Grid search for hyperparameter tuning
+grid_search = GridSearchCV(estimator=model,param_grid=param_grid, cv=5,
+                           scoring="neg_mean_absolute_error")
+
+# Fitting the model
+grid_search.fit(X_train_split, y_train_split)
+
+print("Best parameters found:", grid_search.best_params_)
+
+# Getting the best model from the search
+best_model = grid_search.best_estimator_
 
 # Predictions on the set
-y_pred = model.predict(X_test_split)
+y_pred = best_model.predict(X_test_split)
 """
 Accuracy: Overall percentage of correct predictions.
     If accuracy is 50%, the model is right half the time.
@@ -145,7 +163,7 @@ Confusion Matrix: Shows where the model gets confused
 """
 
 # Evaluation
-accuracy = model.score(X_test_split, y_test_split)
+accuracy = best_model.score(X_test_split, y_test_split)
 print(f"Model accuracy: {accuracy:.2%}")
 
 # Classification

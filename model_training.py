@@ -130,10 +130,10 @@ print("Training the model..")
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 
 param_grid = {
-    'n_estimators': [50, 100, 200],  # Number of trees
-    'max_depth': [None, 10, 20, 30], # Maximum depth of each tree
-    'min_sample_split': [2, 5, 10],  # Minimum number of samples needed to split node
-    'min_sample_leaf': [1, 2, 4]     # Minimum number of samples needed at leaf node
+    'n_estimators': [50, 100, 200],   # Number of trees
+    'max_depth': [None, 10, 20, 30],  # Maximum depth of each tree
+    'min_samples_split': [2, 5, 10],  # Minimum number of samples needed to split node
+    'min_samples_leaf': [1, 2, 4]     # Minimum number of samples needed at leaf node
 }
 
 # Grid search for hyperparameter tuning

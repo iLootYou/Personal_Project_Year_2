@@ -130,9 +130,9 @@ print("Training the model..")
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 
 param_grid = {
-    'n_estimators': [50, 100, 200],   # Number of trees
-    'max_depth': [None, 10, 20, 30],  # Maximum depth of each tree
-    'min_samples_split': [2, 5, 10],  # Minimum number of samples needed to split node
+    'n_estimators': [50, 100, 200],    # Number of trees
+    'max_depth': [None, 10, 20, 30],   # Maximum depth of each tree
+    'min_samples_split': [2, 5, 10],   # Minimum number of samples needed to split node
     'min_samples_leaf': [1, 2, 4]     # Minimum number of samples needed at leaf node
 }
 
@@ -144,6 +144,7 @@ grid_search = GridSearchCV(estimator=model,param_grid=param_grid, cv=5,
 grid_search.fit(X_train_split, y_train_split)
 
 print("Best parameters found:", grid_search.best_params_)
+# Best parameters found: {'max_depth': 10, 'min_samples_leaf': 2, 'min_samples_split': 10, 'n_estimators': 200}
 
 # Getting the best model from the search
 best_model = grid_search.best_estimator_

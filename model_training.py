@@ -4,6 +4,7 @@ import glob
 import pickle
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVR, SVC
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -125,8 +126,11 @@ print("Training dataset created")
 X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
     X_train, y_train, test_size=0.2, random_state=42)
 
+
 # Training the model
 print("Training the model..")
+"""
+# RandomForest
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 
 param_grid = {
@@ -151,6 +155,32 @@ best_model = grid_search.best_estimator_
 
 # Predictions on the set
 y_pred = best_model.predict(X_test_split)
+"""
+# Support Vector Machine (SVM)
+
+model = SVC()
+
+# Grid search for hyperparameter tuning
+param_grid = {
+    'C': [0.1, 1, 10],                    # Control tradeoff between maximizing and minimizing classification error
+    'gamma': [0.1, 1, 10],                # Determines the influence of single training examples
+    'kernel': ['linear', 'rbf', 'poly']   # Defines function used to transform data into higher dimensions
+}
+
+grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=5,
+                           scoring="accuracy")
+
+# Fitting the model
+grid_search.fit(X_train_split, y_train_split)
+
+print("Best parameters found:", grid_search.best_params_)
+
+# Getting the best model from the search
+best_model = grid_search.best_estimator_
+
+# Predictions on the set
+y_pred = best_model.predict(X_test_split)
+
 """
 Accuracy: Overall percentage of correct predictions.
     If accuracy is 50%, the model is right half the time.

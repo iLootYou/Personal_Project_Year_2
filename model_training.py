@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 import glob
 import pickle
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVR, SVC
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -66,7 +67,35 @@ def head2head_training(home_team,away_team, all_data, before_date):
     # Draws count 
     H2H_draws = (last_5['FTR'] == 'D').sum()
 
-    return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws]
+    # Half time hometeam goals
+    H2H_hometeam_halftime_goals_home = last_5[(last_5['HomeTeam'] == home_team)]['HTHG'].sum()
+    H2H_hometeam_halftime_goals_away = last_5[(last_5['AwayTeam'] == home_team)]['HTHG'].sum()
+
+    H2H_hometeam_halftime_goals = H2H_hometeam_halftime_goals_home + H2H_hometeam_halftime_goals_away
+
+    # Half time awayteam goals
+    H2H_awayteam_halftime_goals_home = last_5[(last_5['HomeTeam'] == away_team)]['HTAG'].sum()
+    H2H_awayteam_halftime_goals_away = last_5[(last_5['AwayTeam'] == away_team)]['HTAG'].sum()
+
+    H2H_awayteam_halftime_goals = H2H_awayteam_halftime_goals_home + H2H_awayteam_halftime_goals_away
+
+    # Half time results
+    H2H_hometeam_halftime_wins_home = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'H')].shape[0]
+    H2H_hometeam_halftime_wins_away = last_5[(last_5['AwayTeam'] == home_team) & (last_5['HTR'] == 'A')].shape[0]
+
+    H2H_hometeam_halftime_wins = H2H_hometeam_halftime_wins_home + H2H_hometeam_halftime_wins_away
+
+    H2H_awayteam_halftime_wins_home = last_5[(last_5['HomeTeam'] == away_team) & (last_5['HTR'] == 'H')].shape[0]
+    H2H_awayteam_halftime_wins_away = last_5[(last_5['AwayTeam'] == away_team) & (last_5['HTR'] == 'A')].shape[0]
+
+    H2H_awayteam_halftime_wins = H2H_awayteam_halftime_wins_home + H2H_awayteam_halftime_wins_away
+
+    H2H_halftime_draws = (last_5['HTR'] == 'D').sum()
+
+
+    return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, H2H_hometeam_halftime_goals, 
+            H2H_awayteam_halftime_goals, H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws
+            ]
 
 
 def home_matches_training(home_team, all_data, before_date):
@@ -126,6 +155,15 @@ print("Training dataset created")
 X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
     X_train, y_train, test_size=0.2, random_state=42)
 
+# Normalize data for models like SVM
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_split)
+X_test_scaled = scaler.transform(X_test_split)
+
+# fit_transform on the train data to calculate the parameters and immediately apply the transformation
+# To avoid data leakage we dont fit the test data but just apply the transformation, otherwise it would recalculate
+# Now we ensure that the test data is scaled consistently.
+
 
 # Training the model
 print("Training the model..")
@@ -141,7 +179,7 @@ param_grid = {
 }
 
 # Grid search for hyperparameter tuning
-grid_search = GridSearchCV(estimator=model,param_grid=param_grid, cv=5,
+grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid, cv=5,
                            scoring="neg_mean_absolute_error")
 
 # Fitting the model
@@ -156,22 +194,23 @@ best_model = grid_search.best_estimator_
 # Predictions on the set
 y_pred = best_model.predict(X_test_split)
 """
+"""
 # Support Vector Machine (SVM)
 
 model = SVC()
 
 # Grid search for hyperparameter tuning
 param_grid = {
-    'C': [0.1, 1, 10],                    # Control tradeoff between maximizing and minimizing classification error
-    'gamma': [0.1, 1, 10],                # Determines the influence of single training examples
-    'kernel': ['linear', 'rbf', 'poly']   # Defines function used to transform data into higher dimensions
+    'C': [0.01, 0.1, 1, 10, 100],         # Control tradeoff between maximizing and minimizing classification error
+    'gamma': [0.01, 0.1, 1, 10, 100],     # Determines the influence of single training examples
+    'kernel': ['linear', 'rbf']           # Defines function used to transform data into higher dimensions
 }
 
-grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=5,
+grid_search = RandomizedSearchCV(estimator=model, param_distributions=param_grid, cv=5,
                            scoring="accuracy")
 
 # Fitting the model
-grid_search.fit(X_train_split, y_train_split)
+grid_search.fit(X_train_scaled, y_train_split)
 
 print("Best parameters found:", grid_search.best_params_)
 
@@ -179,7 +218,8 @@ print("Best parameters found:", grid_search.best_params_)
 best_model = grid_search.best_estimator_
 
 # Predictions on the set
-y_pred = best_model.predict(X_test_split)
+y_pred = best_model.predict(X_test_scaled)
+"""
 
 """
 Accuracy: Overall percentage of correct predictions.

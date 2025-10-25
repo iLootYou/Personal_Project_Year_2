@@ -79,6 +79,18 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
     H2H_awayteam_halftime_goals = H2H_awayteam_halftime_goals_home + H2H_awayteam_halftime_goals_away
 
+    # Full time hometeam goals
+    H2H_hometeam_fulltime_goals_home = last_5[(last_5['HomeTeam'] == home_team)]['FTHG'].sum()
+    H2H_hometeam_fulltime_goals_away = last_5[(last_5['AwayTeam'] == home_team)]['FTHG'].sum()
+
+    H2H_hometeam_fulltime_goals = H2H_hometeam_fulltime_goals_home + H2H_hometeam_fulltime_goals_away
+
+    # Full time awayteam goals
+    H2H_awayteam_fulltime_goals_home = last_5[(last_5['HomeTeam'] == away_team)]['FTAG'].sum()
+    H2H_awayteam_fulltime_goals_away = last_5[(last_5['AwayTeam'] == away_team)]['FTAG'].sum()
+
+    H2H_awayteam_fulltime_goals = H2H_awayteam_fulltime_goals_home + H2H_awayteam_fulltime_goals_away
+
     # Half time results
     H2H_hometeam_halftime_wins_home = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'H')].shape[0]
     H2H_hometeam_halftime_wins_away = last_5[(last_5['AwayTeam'] == home_team) & (last_5['HTR'] == 'A')].shape[0]
@@ -94,7 +106,8 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
 
     return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, H2H_hometeam_halftime_goals, 
-            H2H_awayteam_halftime_goals, H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws
+            H2H_awayteam_halftime_goals, H2H_hometeam_fulltime_goals, H2H_awayteam_fulltime_goals,  
+            H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws
             ]
 
 
@@ -120,6 +133,9 @@ def home_matches_training(home_team, all_data, before_date):
     # Amount of half time goals when playing at home
     home_match_halftime_goals = last_5[(last_5['HomeTeam'] == home_team)]['HTHG'].sum()
 
+    # Amount of full time goals when playing at home
+    home_match_fulltime_goals = last_5[(last_5['HomeTeam'] == home_team)]['FTHG'].sum()
+
     # Amount of times they are winning at half time when playing at home
     home_match_halftime_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'H')].shape[0]
 
@@ -129,8 +145,10 @@ def home_matches_training(home_team, all_data, before_date):
     # Amount of times they are drawing at half time when playing at home
     home_match_halftime_draws = (last_5['HTR'] == 'D').sum()
 
-    return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, home_match_wins, 
-            home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws]
+    return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, 
+            home_match_fulltime_goals,home_match_wins, home_match_halftime_wins, home_match_halftime_losses, 
+            home_match_halftime_draws
+            ]
 
 # Training dataset
 X_train = []
@@ -147,6 +165,11 @@ for idx, match in all_data.iterrows():
     away_team = match["AwayTeam"]
     match_date = match["Date"]
     outcome = match["FTR"]
+    half_time_result = match["HTR"]
+    half_time_hometeam_goals = match["HTHG"]
+    half_time_awayteam_goals = match["HTAG"]
+    full_time_hometeam_goals = match["FTHG"]
+    full_time_awayteam_goals = match["FTAG"]
 
     # Get the features using data before this match
     h2h_stats = head2head_training(home_team, away_team, all_data, match_date)

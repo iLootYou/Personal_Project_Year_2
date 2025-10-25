@@ -117,7 +117,20 @@ def home_matches_training(home_team, all_data, before_date):
     # Amount of they draw when playing at home 
     home_match_draws = (last_5['FTR'] == 'D').sum()
 
-    return [home_match_wins, home_match_losses, home_match_draws]
+    # Amount of half time goals when playing at home
+    home_match_halftime_goals = last_5[(last_5['HomeTeam'] == home_team)]['HTHG'].sum()
+
+    # Amount of times they are winning at half time when playing at home
+    home_match_halftime_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'H')].shape[0]
+
+    # Amount of times they are losing at half time when playing at home
+    home_match_halftime_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'A')].shape[0]
+
+    # Amount of times they are drawing at half time when playing at home
+    home_match_halftime_draws = (last_5['HTR'] == 'D').sum()
+
+    return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, home_match_wins, 
+            home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws]
 
 # Training dataset
 X_train = []

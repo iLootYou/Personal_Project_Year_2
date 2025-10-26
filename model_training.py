@@ -3,10 +3,11 @@ import numpy as np
 import glob
 import pickle
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVR, SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from imblearn.over_sampling import SMOTE
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -43,7 +44,8 @@ def head2head_training(home_team,away_team, all_data, before_date):
     last_5 = h2h_matches.sort_values(by="Date").tail(5)
 
     if len(last_5) == 0:
-        return [0,0,0]
+        # Return a zeroed list matching the full feature count
+        return [0] * 10  # Or however many features you always expect
 
     # Shape[0] counts rows passing both filters, shape[1] gives columns and shape gives both
     # Home team wins when playing at home
@@ -119,7 +121,8 @@ def home_matches_training(home_team, all_data, before_date):
     last_5 = home_matches.sort_values(by="Date").tail(5)
 
     if len(last_5) == 0:
-        return [0,0,0]
+        # Return a zeroed list matching the full feature count
+        return [0] * 17  # Or however many features you always expect
 
     # Amount of times they win when playing at home
     home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
@@ -145,9 +148,34 @@ def home_matches_training(home_team, all_data, before_date):
     # Amount of times they are drawing at half time when playing at home
     home_match_halftime_draws = (last_5['HTR'] == 'D').sum()
 
+    # Amount of times they shots they had when playing at home
+    home_match_shots = last_5[(last_5['HomeTeam'] == home_team)]['HS'].sum()
+
+    # Amount of times they had shots on target when playing at home
+    home_match_shots_on_target = last_5[(last_5['HomeTeam'] == home_team)]['HST'].sum()
+
+    # Amount of times they hit the woodwork when playing at home
+    home_match_woodwork = last_5[(last_5['HomeTeam'] == home_team)]['HHW'].sum()
+
+    # Amount of times they had a corner when playing at home
+    home_match_corners = last_5[(last_5['HomeTeam'] == home_team)]['HC'].sum()
+
+    # Amount of times they commited a foul when playing at home
+    home_match_fouls = last_5[(last_5['HomeTeam'] == home_team)]['HF'].sum()
+
+    # Amount of times they were offside when playing at home
+    home_match_offsides = last_5[(last_5['HomeTeam'] == home_team)]['HO'].sum()
+
+    # Amount of times they were given a yellow card when playing at home
+    home_match_yellow_card = last_5[(last_5['HomeTeam'] == home_team)]['HY'].sum()
+
+    # Amount of times they were given a red card when playing at home
+    home_match_red_card = last_5[(last_5['HomeTeam'] == home_team)]['HR'].sum()
+
     return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, 
             home_match_fulltime_goals,home_match_wins, home_match_halftime_wins, home_match_halftime_losses, 
-            home_match_halftime_draws
+            home_match_halftime_draws, home_match_shots, home_match_shots_on_target, home_match_woodwork, 
+            home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card, home_match_red_card
             ]
 
 # Training dataset
@@ -196,6 +224,10 @@ scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train_split)
 X_test_scaled = scaler.transform(X_test_split)
 
+# Synthetic minority oversampeling technique
+smote = SMOTE(random_state=42)
+X_resampled, y_resampled = smote.fit_resample(X_train_split, y_train_split)
+
 # fit_transform on the train data to calculate the parameters and immediately apply the transformation
 # To avoid data leakage we dont fit the test data but just apply the transformation, otherwise it would recalculate
 # Now we ensure that the test data is scaled consistently.
@@ -203,15 +235,15 @@ X_test_scaled = scaler.transform(X_test_split)
 
 # Training the model
 print("Training the model..")
-"""
+
 # RandomForest
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+model = RandomForestClassifier(random_state=42)
 
 param_grid = {
     'n_estimators': [50, 100, 200],    # Number of trees
     'max_depth': [None, 10, 20, 30],   # Maximum depth of each tree
     'min_samples_split': [2, 5, 10],   # Minimum number of samples needed to split node
-    'min_samples_leaf': [1, 2, 4]     # Minimum number of samples needed at leaf node
+    'min_samples_leaf': [1, 2, 4]      # Minimum number of samples needed at leaf node
 }
 
 # Grid search for hyperparameter tuning
@@ -222,18 +254,19 @@ grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid,
 grid_search.fit(X_train_split, y_train_split)
 
 print("Best parameters found:", grid_search.best_params_)
-# Best parameters found: {'max_depth': 10, 'min_samples_leaf': 2, 'min_samples_split': 10, 'n_estimators': 200}
+# Best parameters found: {'n_estimators': 50, 'min_samples_split': 5, 'min_samples_leaf': 4, 'max_depth': 10}
+# Model accuracy: 48.04%
 
 # Getting the best model from the search
 best_model = grid_search.best_estimator_
 
 # Predictions on the set
 y_pred = best_model.predict(X_test_split)
-"""
+
 """
 # Support Vector Machine (SVM)
 
-model = SVC()
+model = SVC(class_weight='balanced')
 
 # Grid search for hyperparameter tuning
 param_grid = {
@@ -255,6 +288,30 @@ best_model = grid_search.best_estimator_
 
 # Predictions on the set
 y_pred = best_model.predict(X_test_scaled)
+"""
+"""
+# Gradient boost
+
+model = GradientBoostingClassifier(random_state=42)
+
+param_grid = {
+    'n_estimators': [50, 100, 200],         # Number of trees
+    'max_depth': [None, 1, 2, 4, 6, 8],     # complexity of each tree
+    'learning_rate': [0.01, 0.1, 1]         # shrinkage step               
+}
+
+grid_search = RandomizedSearchCV(estimator=model, param_distributions=param_grid, cv=5,
+                           scoring="accuracy")
+
+# Fitting the model
+grid_search.fit(X_train_split, y_train_split)
+
+print("Best parameters found:", grid_search.best_params_)
+
+best_model = grid_search.best_estimator_
+
+# Predictions on the set
+y_pred = best_model.predict(X_test_split)
 """
 
 """

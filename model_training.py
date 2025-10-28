@@ -45,7 +45,7 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 26  # Or however many features you always expect
+        return [0] * 31  # Or however many features you always expect
 
     # Shape[0] counts rows passing both filters, shape[1] gives columns and shape gives both
     # Home team wins when playing at home
@@ -211,7 +211,21 @@ def head2head_training(home_team,away_team, all_data, before_date):
     H2H_awayteam_red_card_home = last_5[(last_5['HomeTeam'] == away_team)]['HR'].sum()
     H2H_awayteam_red_card_away = last_5[(last_5['AwayTeam'] == away_team)]['AR'].sum()
 
-    H2H_awayteam_red_card = H2H_awayteam_red_card_home + H2H_awayteam_red_card_away     
+    H2H_awayteam_red_card = H2H_awayteam_red_card_home + H2H_awayteam_red_card_away
+    #------------------------------------------------------------------------------------------------------------ 
+
+    # Total home team winning betting odds Bet365
+    H2H_bet365_hometeam_probability_home = 1 / last_5[(last_5['HomeTeam'] == home_team)]['B365H'].mean()
+    H2H_bet365_hometeam_probability_away = 1 / last_5[(last_5['AwayTeam'] == home_team)]['B365A'].mean()
+    #------------------------------------------------------------------------------------------------------------ 
+
+    # Total away team winning betting odds Bet365
+    H2H_bet365_awayteam_probability_home = 1 / last_5[(last_5['HomeTeam'] == away_team)]['B365H'].mean()
+    H2H_bet365_awayteam_probability_away = 1 / last_5[(last_5['AwayTeam'] == away_team)]['B365A'].mean()
+    #------------------------------------------------------------------------------------------------------------ 
+
+    # Total draw betting odds Bet365
+    H2H_bet365_probability_draws = 1 / (last_5['B365D']).mean()
 
 
     return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, H2H_hometeam_halftime_goals, 
@@ -220,7 +234,10 @@ def head2head_training(home_team,away_team, all_data, before_date):
             H2H_awayteam_shots, H2H_hometeam_shots_on_target, H2H_awayteam_shots_on_target, H2H_hometeam_woodwork,
             H2H_awayteam_woodwork, H2H_hometeam_corners, H2H_awayteam_corners, H2H_hometeam_fouls, 
             H2H_awayteam_fouls, H2H_hometeam_offsides, H2H_awayteam_offsides, H2H_hometeam_yellow_card,
-            H2H_awayteam_yellow_card, H2H_hometeam_red_card, H2H_awayteam_red_card
+            H2H_awayteam_yellow_card, H2H_hometeam_red_card, H2H_awayteam_red_card, 
+            H2H_bet365_hometeam_probability_home, H2H_bet365_hometeam_probability_away,
+            H2H_bet365_awayteam_probability_home, H2H_bet365_awayteam_probability_away,
+            H2H_bet365_probability_draws
             ]
 
 
@@ -309,6 +326,20 @@ for idx, match in all_data.iterrows():
     half_time_awayteam_goals = match["HTAG"]
     full_time_hometeam_goals = match["FTHG"]
     full_time_awayteam_goals = match["FTAG"]
+    hometeam_shots_on_target = match["HST"] 
+    awayteam_shots_on_target = match["AST"]
+    hometeam_hit_woodwork = match["HHW"]
+    awayteam_hit_woodwork = match["AHW"]
+    hometeam_corners = match["HC"]
+    awayteam_corners = match["AC"]
+    hometeam_fouls_committed = match["HF"]
+    awayteam_fouls_committed = match["AF"]
+    hometeam_offsides = match["HO"]
+    awayteam_offsides = match["AO"]
+    hometeam_yellow_cards = match["HY"]
+    awayteam_yellow_cards = match["AY"]
+    hometeam_red_cards = match["HR"]
+    awayteam_red_cards = match["AR"]
 
     # Get the features using data before this match
     h2h_stats = head2head_training(home_team, away_team, all_data, match_date)
@@ -365,8 +396,8 @@ grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid,
 grid_search.fit(X_train_split, y_train_split)
 
 print("Best parameters found:", grid_search.best_params_)
-# Best parameters found: {'n_estimators': 50, 'min_samples_split': 5, 'min_samples_leaf': 4, 'max_depth': 10}
-# Model accuracy: 48.04%
+# Best parameters found: {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 4, 'max_depth': 30}
+# Model accuracy: 50.97%
 
 # Getting the best model from the search
 best_model = grid_search.best_estimator_

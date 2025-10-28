@@ -8,6 +8,7 @@ from sklearn.svm import SVR, SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from imblearn.over_sampling import SMOTE
+from scipy.stats import randint
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -214,18 +215,45 @@ def head2head_training(home_team,away_team, all_data, before_date):
     H2H_awayteam_red_card = H2H_awayteam_red_card_home + H2H_awayteam_red_card_away
     #------------------------------------------------------------------------------------------------------------ 
 
-    # Total home team winning betting odds Bet365
-    H2H_bet365_hometeam_probability_home = 1 / last_5[(last_5['HomeTeam'] == home_team)]['B365H'].mean()
-    H2H_bet365_hometeam_probability_away = 1 / last_5[(last_5['AwayTeam'] == home_team)]['B365A'].mean()
-    #------------------------------------------------------------------------------------------------------------ 
+    # For HomeTeam home odds
+    subset_home = last_5[(last_5['HomeTeam'] == home_team)]['B365H']
+    if subset_home.empty or subset_home.isnull().all():
+        H2H_bet365_hometeam_probability_home = 0
+    else:
+        mean_val = subset_home.mean()
+        H2H_bet365_hometeam_probability_home = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
 
-    # Total away team winning betting odds Bet365
-    H2H_bet365_awayteam_probability_home = 1 / last_5[(last_5['HomeTeam'] == away_team)]['B365H'].mean()
-    H2H_bet365_awayteam_probability_away = 1 / last_5[(last_5['AwayTeam'] == away_team)]['B365A'].mean()
-    #------------------------------------------------------------------------------------------------------------ 
+    # For HomeTeam away odds
+    subset_away = last_5[(last_5['AwayTeam'] == home_team)]['B365A']
+    if subset_away.empty or subset_away.isnull().all():
+        H2H_bet365_hometeam_probability_away = 0
+    else:
+        mean_val = subset_away.mean()
+        H2H_bet365_hometeam_probability_away = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
 
-    # Total draw betting odds Bet365
-    H2H_bet365_probability_draws = 1 / (last_5['B365D']).mean()
+    # For AwayTeam home odds
+    subset_away_team_home = last_5[(last_5['HomeTeam'] == away_team)]['B365H']
+    if subset_away_team_home.empty or subset_away_team_home.isnull().all():
+        H2H_bet365_awayteam_probability_home = 0
+    else:
+        mean_val = subset_away_team_home.mean()
+        H2H_bet365_awayteam_probability_home = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
+
+    # For AwayTeam away odds
+    subset_away_team_away = last_5[(last_5['AwayTeam'] == away_team)]['B365A']
+    if subset_away_team_away.empty or subset_away_team_away.isnull().all():
+        H2H_bet365_awayteam_probability_away = 0
+    else:
+        mean_val = subset_away_team_away.mean()
+        H2H_bet365_awayteam_probability_away = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
+
+    # For draws
+    subset_draws = last_5['B365D']
+    if subset_draws.empty or subset_draws.isnull().all():
+        H2H_bet365_probability_draws = 0
+    else:
+        mean_val = subset_draws.mean()
+        H2H_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
 
 
     return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, H2H_hometeam_halftime_goals, 
@@ -301,14 +329,29 @@ def home_matches_training(home_team, all_data, before_date):
     home_match_red_card = last_5[(last_5['HomeTeam'] == home_team)]['HR'].sum()
 
     # Probability Bet365 hometeam wins
-    home_match_bet365_probability_wins = 1 / last_5[(last_5['HomeTeam'] == home_team)]['B365H'].mean()
+    subset_wins = last_5[(last_5["HomeTeam"] == home_team)]['B365H']
+    if subset_wins.empty or subset_wins.isnull().all():
+        home_match_bet365_probability_wins = 0
+    else:
+        mean_val = subset_wins.mean()
+        home_match_bet365_probability_wins = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
 
     # Probability Bet365 hometeam losses
-    home_match_bet365_probability_losses = 1 / last_5[(last_5['HomeTeam'] == home_team)]['B365A'].mean()
+    subset_losses = last_5[(last_5['HomeTeam'] == home_team)]['B365A']
+    if subset_losses.empty or subset_losses.isnull().all():
+        home_match_bet365_probability_losses = 0
+    else:
+        mean_val = subset_losses.mean()
+        home_match_bet365_probability_losses = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
 
     # Probability Bet365 draw
-    home_match_bet365_probability_draws = 1 / (last_5['B365D']).mean()
-
+    subset_draws = last_5['B365D']
+    if subset_draws.empty or subset_draws.isnull().all():
+        home_match_bet365_probability_draws = 0
+    else:
+        mean_val = subset_draws.mean()
+        home_match_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
+    
 
     return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, 
             home_match_fulltime_goals,home_match_wins, home_match_halftime_wins, home_match_halftime_losses, 
@@ -397,10 +440,10 @@ print("Training the model..")
 model = RandomForestClassifier(random_state=42)
 
 param_grid = {
-    'n_estimators': [50, 100, 200],    # Number of trees
-    'max_depth': [None, 10, 20, 30],   # Maximum depth of each tree
-    'min_samples_split': [2, 5, 10],   # Minimum number of samples needed to split node
-    'min_samples_leaf': [1, 2, 4]      # Minimum number of samples needed at leaf node
+    'n_estimators': randint(50, 500),      # Number of trees
+    'max_depth': randint(5, 50),           # Maximum depth of each tree
+    'min_samples_split': randint(2, 20),   # Minimum number of samples needed to split node
+    'min_samples_leaf': randint(1, 5)      # Minimum number of samples needed at leaf node
 }
 
 # Grid search for hyperparameter tuning
@@ -411,8 +454,8 @@ grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid,
 grid_search.fit(X_train_split, y_train_split)
 
 print("Best parameters found:", grid_search.best_params_)
-# Best parameters found: {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 4, 'max_depth': 30}
-# Model accuracy: 50.97%
+# Best parameters found: {'n_estimators': 200, 'min_samples_split': 10, 'min_samples_leaf': 1, 'max_depth': 30}
+# Model accuracy: 52.08%
 
 # Getting the best model from the search
 best_model = grid_search.best_estimator_

@@ -300,10 +300,22 @@ def home_matches_training(home_team, all_data, before_date):
     # Amount of times they were given a red card when playing at home
     home_match_red_card = last_5[(last_5['HomeTeam'] == home_team)]['HR'].sum()
 
+    # Probability Bet365 hometeam wins
+    home_match_bet365_probability_wins = 1 / last_5[(last_5['HomeTeam'] == home_team)]['B365H'].mean()
+
+    # Probability Bet365 hometeam losses
+    home_match_bet365_probability_losses = 1 / last_5[(last_5['HomeTeam'] == home_team)]['B365A'].mean()
+
+    # Probability Bet365 draw
+    home_match_bet365_probability_draws = 1 / (last_5['B365D']).mean()
+
+
     return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, 
             home_match_fulltime_goals,home_match_wins, home_match_halftime_wins, home_match_halftime_losses, 
             home_match_halftime_draws, home_match_shots, home_match_shots_on_target, home_match_woodwork, 
-            home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card, home_match_red_card
+            home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card, home_match_red_card,
+            home_match_bet365_probability_wins, home_match_bet365_probability_losses, 
+            home_match_bet365_probability_draws
             ]
 
 # Training dataset
@@ -340,6 +352,9 @@ for idx, match in all_data.iterrows():
     awayteam_yellow_cards = match["AY"]
     hometeam_red_cards = match["HR"]
     awayteam_red_cards = match["AR"]
+    bet365_hometeam_win_odds = match['B365H']
+    bet365_awayteam_win_odds = match['B365A']
+    bet365_draw_odds = match['B365D']
 
     # Get the features using data before this match
     h2h_stats = head2head_training(home_team, away_team, all_data, match_date)

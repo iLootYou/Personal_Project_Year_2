@@ -47,7 +47,7 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 31  # Or however many features you always expect
+        return [0] * 32  # Or however many features you always expect
 
     # Shape[0] counts rows passing both filters, shape[1] gives columns and shape gives both
     # Home team wins when playing at home
@@ -96,6 +96,9 @@ def head2head_training(home_team,away_team, all_data, before_date):
     H2H_awayteam_fulltime_goals_away = last_5[(last_5['AwayTeam'] == away_team)]['FTAG'].sum()
 
     H2H_awayteam_fulltime_goals = H2H_awayteam_fulltime_goals_home + H2H_awayteam_fulltime_goals_away
+
+    # Goal difference
+    H2H_goal_diff = H2H_hometeam_fulltime_goals - H2H_awayteam_fulltime_goals
     #------------------------------------------------------------------------------------------------------------
 
     # Half time results
@@ -258,7 +261,7 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
 
     return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, H2H_hometeam_halftime_goals, 
-            H2H_awayteam_halftime_goals, H2H_hometeam_fulltime_goals, H2H_awayteam_fulltime_goals,  
+            H2H_awayteam_halftime_goals, H2H_hometeam_fulltime_goals, H2H_awayteam_fulltime_goals, H2H_goal_diff,  
             H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws, H2H_hometeam_shots,
             H2H_awayteam_shots, H2H_hometeam_shots_on_target, H2H_awayteam_shots_on_target, H2H_hometeam_woodwork,
             H2H_awayteam_woodwork, H2H_hometeam_corners, H2H_awayteam_corners, H2H_hometeam_fouls, 
@@ -279,10 +282,13 @@ def home_matches_training(home_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 20  # Or however many features you always expect
+        return [0] * 23  # Or however many features you always expect
 
     # Amount of times they win when playing at home
     home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
+
+    # Home win rate percentage
+    home_win_rate = home_match_wins / 5  # Last 5 matches
 
     # Amount of times they lose when playing at home
     home_match_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
@@ -311,6 +317,10 @@ def home_matches_training(home_team, all_data, before_date):
     # Amount of times they had shots on target when playing at home
     home_match_shots_on_target = last_5[(last_5['HomeTeam'] == home_team)]['HST'].sum()
 
+    # Efficiency metrics
+    shot_accuracy = home_match_shots_on_target / home_match_shots if home_match_shots > 0 else 0
+    conversion_rate = home_match_fulltime_goals / home_match_shots_on_target if home_match_shots_on_target > 0 else 0
+
     # Amount of times they hit the woodwork when playing at home
     home_match_woodwork = last_5[(last_5['HomeTeam'] == home_team)]['HHW'].sum()
 
@@ -328,6 +338,9 @@ def home_matches_training(home_team, all_data, before_date):
 
     # Amount of times they were given a red card when playing at home
     home_match_red_card = last_5[(last_5['HomeTeam'] == home_team)]['HR'].sum()
+
+    # Form indicator, recent points
+    recent_points = (home_match_wins * 3) + (home_match_draws * 1)
 
     # Probability Bet365 hometeam wins
     subset_wins = last_5[(last_5["HomeTeam"] == home_team)]['B365H']
@@ -354,12 +367,12 @@ def home_matches_training(home_team, all_data, before_date):
         home_match_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
     
 
-    return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, 
+    return [home_match_wins, home_win_rate, home_match_losses, home_match_draws, home_match_halftime_goals, 
             home_match_fulltime_goals, home_match_halftime_wins, home_match_halftime_losses, 
-            home_match_halftime_draws, home_match_shots, home_match_shots_on_target, home_match_woodwork, 
-            home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card, home_match_red_card,
-            home_match_bet365_probability_wins, home_match_bet365_probability_losses, 
-            home_match_bet365_probability_draws
+            home_match_halftime_draws, home_match_shots, home_match_shots_on_target, shot_accuracy, conversion_rate, 
+            home_match_woodwork, home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card,
+            home_match_red_card, recent_points, home_match_bet365_probability_wins, 
+            home_match_bet365_probability_losses, home_match_bet365_probability_draws
             ]
 
 def away_matches_training(away_team, all_data, before_date):
@@ -371,10 +384,13 @@ def away_matches_training(away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 20  # Matching the number of features returned
+        return [0] * 23  # Matching the number of features returned
 
     # Amount of times they win when playing away
     away_match_wins = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'A')].shape[0]
+
+    # Away win rate percentage
+    away_win_rate = away_match_wins / 5  # Last 5 matches
 
     # Amount of times they lose when playing away
     away_match_losses = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'H')].shape[0]
@@ -403,6 +419,10 @@ def away_matches_training(away_team, all_data, before_date):
     # Amount of times they had shots on target when playing away
     away_match_shots_on_target = last_5[(last_5['AwayTeam'] == away_team)]['AST'].sum()
 
+    # Efficiency metrics
+    shot_accuracy = away_match_shots_on_target / away_match_shots if away_match_shots > 0 else 0
+    conversion_rate = away_match_fulltime_goals / away_match_shots_on_target if away_match_shots_on_target > 0 else 0
+
     # Amount of times they hit the woodwork when playing away
     away_match_woodwork = last_5[(last_5['AwayTeam'] == away_team)]['AHW'].sum()
 
@@ -420,6 +440,9 @@ def away_matches_training(away_team, all_data, before_date):
 
     # Amount of times they were given a red card when playing away
     away_match_red_card = last_5[(last_5['AwayTeam'] == away_team)]['AR'].sum()
+
+    # Form indicator, recent points
+    recent_points = (away_match_wins * 3) + (away_match_draws * 1)
 
     # Probability Bet365 awayteam wins
     subset_wins = last_5[(last_5["AwayTeam"] == away_team)]['B365A']
@@ -446,12 +469,12 @@ def away_matches_training(away_team, all_data, before_date):
         away_match_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
     
 
-    return [away_match_wins, away_match_losses, away_match_draws, away_match_halftime_goals, 
+    return [away_match_wins, away_win_rate, away_match_losses, away_match_draws, away_match_halftime_goals, 
             away_match_fulltime_goals, away_match_halftime_wins, away_match_halftime_losses, 
-            away_match_halftime_draws, away_match_shots, away_match_shots_on_target, away_match_woodwork, 
-            away_match_corners, away_match_fouls, away_match_offsides, away_match_yellow_card, away_match_red_card,
-            away_match_bet365_probability_wins, away_match_bet365_probability_losses, 
-            away_match_bet365_probability_draws
+            away_match_halftime_draws, away_match_shots, away_match_shots_on_target, away_match_woodwork,
+            shot_accuracy, conversion_rate,away_match_corners, away_match_fouls, away_match_offsides, 
+            away_match_yellow_card, away_match_red_card,recent_points, away_match_bet365_probability_wins, 
+            away_match_bet365_probability_losses, away_match_bet365_probability_draws
             ]
 
 # Training dataset
@@ -512,7 +535,7 @@ print("After SMOTE:", Counter(y_smote))
 print("Training the model..")
 
 # RandomForest
-model = RandomForestClassifier(random_state=42)
+model = RandomForestClassifier(random_state=42, class_weight='balanced')
 
 param_grid = {
     'n_estimators': randint(50, 500),      # Number of trees
@@ -523,7 +546,7 @@ param_grid = {
 
 # Grid search for hyperparameter tuning
 grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid, cv=5,
-                           scoring="neg_mean_absolute_error")
+                           scoring="accuracy")
 
 # Fitting the model
 grid_search.fit(X_train_scaled, y_train_split)

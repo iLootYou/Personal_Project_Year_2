@@ -8,6 +8,7 @@ from sklearn.svm import SVR, SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from imblearn.over_sampling import SMOTE
+from collections import Counter
 from scipy.stats import randint
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -278,7 +279,7 @@ def home_matches_training(home_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 17  # Or however many features you always expect
+        return [0] * 20  # Or however many features you always expect
 
     # Amount of times they win when playing at home
     home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
@@ -354,11 +355,103 @@ def home_matches_training(home_team, all_data, before_date):
     
 
     return [home_match_wins, home_match_losses, home_match_draws, home_match_halftime_goals, 
-            home_match_fulltime_goals,home_match_wins, home_match_halftime_wins, home_match_halftime_losses, 
+            home_match_fulltime_goals, home_match_halftime_wins, home_match_halftime_losses, 
             home_match_halftime_draws, home_match_shots, home_match_shots_on_target, home_match_woodwork, 
             home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card, home_match_red_card,
             home_match_bet365_probability_wins, home_match_bet365_probability_losses, 
             home_match_bet365_probability_draws
+            ]
+
+def away_matches_training(away_team, all_data, before_date):
+    # Append the matches to the array where the away team is in the column AwayTeam
+    away_matches = all_data[(all_data["AwayTeam"] == away_team) & (all_data["Date"] < before_date)]
+
+    # Sort by the date and get the last 5 
+    last_5 = away_matches.sort_values(by="Date").tail(5)
+
+    if len(last_5) == 0:
+        # Return a zeroed list matching the full feature count
+        return [0] * 20  # Matching the number of features returned
+
+    # Amount of times they win when playing away
+    away_match_wins = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'A')].shape[0]
+
+    # Amount of times they lose when playing away
+    away_match_losses = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'H')].shape[0]
+
+    # Amount of times they draw when playing away 
+    away_match_draws = (last_5['FTR'] == 'D').sum()
+
+    # Amount of half time goals when playing away
+    away_match_halftime_goals = last_5[(last_5['AwayTeam'] == away_team)]['HTAG'].sum()
+
+    # Amount of full time goals when playing away
+    away_match_fulltime_goals = last_5[(last_5['AwayTeam'] == away_team)]['FTAG'].sum()
+
+    # Amount of times they are winning at half time when playing away
+    away_match_halftime_wins = last_5[(last_5['AwayTeam'] == away_team) & (last_5['HTR'] == 'A')].shape[0]
+
+    # Amount of times they are losing at half time when playing away
+    away_match_halftime_losses = last_5[(last_5['AwayTeam'] == away_team) & (last_5['HTR'] == 'H')].shape[0]
+
+    # Amount of times they are drawing at half time when playing away
+    away_match_halftime_draws = (last_5['HTR'] == 'D').sum()
+
+    # Amount of shots they had when playing away
+    away_match_shots = last_5[(last_5['AwayTeam'] == away_team)]['AS'].sum()
+
+    # Amount of times they had shots on target when playing away
+    away_match_shots_on_target = last_5[(last_5['AwayTeam'] == away_team)]['AST'].sum()
+
+    # Amount of times they hit the woodwork when playing away
+    away_match_woodwork = last_5[(last_5['AwayTeam'] == away_team)]['AHW'].sum()
+
+    # Amount of times they had a corner when playing away
+    away_match_corners = last_5[(last_5['AwayTeam'] == away_team)]['AC'].sum()
+
+    # Amount of times they committed a foul when playing away
+    away_match_fouls = last_5[(last_5['AwayTeam'] == away_team)]['AF'].sum()
+
+    # Amount of times they were offside when playing away
+    away_match_offsides = last_5[(last_5['AwayTeam'] == away_team)]['AO'].sum()
+
+    # Amount of times they were given a yellow card when playing away
+    away_match_yellow_card = last_5[(last_5['AwayTeam'] == away_team)]['AY'].sum()
+
+    # Amount of times they were given a red card when playing away
+    away_match_red_card = last_5[(last_5['AwayTeam'] == away_team)]['AR'].sum()
+
+    # Probability Bet365 awayteam wins
+    subset_wins = last_5[(last_5["AwayTeam"] == away_team)]['B365A']
+    if subset_wins.empty or subset_wins.isnull().all():
+        away_match_bet365_probability_wins = 0
+    else:
+        mean_val = subset_wins.mean()
+        away_match_bet365_probability_wins = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
+
+    # Probability Bet365 awayteam losses
+    subset_losses = last_5[(last_5['AwayTeam'] == away_team)]['B365H']
+    if subset_losses.empty or subset_losses.isnull().all():
+        away_match_bet365_probability_losses = 0
+    else:
+        mean_val = subset_losses.mean()
+        away_match_bet365_probability_losses = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
+
+    # Probability Bet365 draw
+    subset_draws = last_5['B365D']
+    if subset_draws.empty or subset_draws.isnull().all():
+        away_match_bet365_probability_draws = 0
+    else:
+        mean_val = subset_draws.mean()
+        away_match_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
+    
+
+    return [away_match_wins, away_match_losses, away_match_draws, away_match_halftime_goals, 
+            away_match_fulltime_goals, away_match_halftime_wins, away_match_halftime_losses, 
+            away_match_halftime_draws, away_match_shots, away_match_shots_on_target, away_match_woodwork, 
+            away_match_corners, away_match_fouls, away_match_offsides, away_match_yellow_card, away_match_red_card,
+            away_match_bet365_probability_wins, away_match_bet365_probability_losses, 
+            away_match_bet365_probability_draws
             ]
 
 # Training dataset
@@ -376,36 +469,15 @@ for idx, match in all_data.iterrows():
     away_team = match["AwayTeam"]
     match_date = match["Date"]
     outcome = match["FTR"]
-    half_time_result = match["HTR"]
-    half_time_hometeam_goals = match["HTHG"]
-    half_time_awayteam_goals = match["HTAG"]
-    full_time_hometeam_goals = match["FTHG"]
-    full_time_awayteam_goals = match["FTAG"]
-    hometeam_shots_on_target = match["HST"] 
-    awayteam_shots_on_target = match["AST"]
-    hometeam_hit_woodwork = match["HHW"]
-    awayteam_hit_woodwork = match["AHW"]
-    hometeam_corners = match["HC"]
-    awayteam_corners = match["AC"]
-    hometeam_fouls_committed = match["HF"]
-    awayteam_fouls_committed = match["AF"]
-    hometeam_offsides = match["HO"]
-    awayteam_offsides = match["AO"]
-    hometeam_yellow_cards = match["HY"]
-    awayteam_yellow_cards = match["AY"]
-    hometeam_red_cards = match["HR"]
-    awayteam_red_cards = match["AR"]
-    bet365_hometeam_win_odds = match['B365H']
-    bet365_awayteam_win_odds = match['B365A']
-    bet365_draw_odds = match['B365D']
 
     # Get the features using data before this match
     h2h_stats = head2head_training(home_team, away_team, all_data, match_date)
     home_stats = home_matches_training(home_team, all_data, match_date)
+    away_stats = away_matches_training(away_team, all_data, match_date)
 
     # Only include matches with historical data
-    if sum(h2h_stats) > 0 or sum(home_stats) > 0:
-        features = h2h_stats + home_stats
+    if sum(h2h_stats) > 0 or sum(home_stats) > 0 or sum(away_stats) > 0:
+        features = h2h_stats + home_stats + away_stats
         X_train.append(features)
         y_train.append(mapping[outcome])
     
@@ -414,19 +486,22 @@ X_train = np.array(X_train)
 y_train = np.array(y_train)
 
 print("Training dataset created")
+print("Original class distribution:", Counter(y_train))
 
 # Split into training and test data 
 X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
     X_train, y_train, test_size=0.2, random_state=42)
 
-# Normalize data for models like SVM
+# Normalize data for models 
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train_split)
 X_test_scaled = scaler.transform(X_test_split)
 
 # Synthetic minority oversampeling technique
+print("Before SMOTE:", Counter(y_train_split))
 smote = SMOTE(random_state=42)
-X_resampled, y_resampled = smote.fit_resample(X_train_split, y_train_split)
+X_smote, y_smote = smote.fit_resample(X_train_split, y_train_split)
+print("After SMOTE:", Counter(y_smote))
 
 # fit_transform on the train data to calculate the parameters and immediately apply the transformation
 # To avoid data leakage we dont fit the test data but just apply the transformation, otherwise it would recalculate
@@ -451,7 +526,7 @@ grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid,
                            scoring="neg_mean_absolute_error")
 
 # Fitting the model
-grid_search.fit(X_train_split, y_train_split)
+grid_search.fit(X_train_scaled, y_train_split)
 
 print("Best parameters found:", grid_search.best_params_)
 # Best parameters found: {'n_estimators': 200, 'min_samples_split': 10, 'min_samples_leaf': 1, 'max_depth': 30}
@@ -461,7 +536,7 @@ print("Best parameters found:", grid_search.best_params_)
 best_model = grid_search.best_estimator_
 
 # Predictions on the set
-y_pred = best_model.predict(X_test_split)
+y_pred = best_model.predict(X_test_scaled)
 
 """
 # Support Vector Machine (SVM)
@@ -527,7 +602,7 @@ Confusion Matrix: Shows where the model gets confused
 """
 
 # Evaluation
-accuracy = best_model.score(X_test_split, y_test_split)
+accuracy = best_model.score(X_test_scaled, y_test_split)
 print(f"Model accuracy: {accuracy:.2%}")
 
 # Classification

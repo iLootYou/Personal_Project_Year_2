@@ -259,7 +259,7 @@ def home_matches_training(home_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 30  # Or however many features you always expect
+        return [0] * 31  # Or however many features you always expect
     
     num_matches = len(last_5)
 
@@ -366,7 +366,7 @@ def home_matches_training(home_team, all_data, before_date):
         home_match_clean_sheets,  
         home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws, 
         home_match_shots, home_match_shots_on_target, shot_accuracy, conversion_rate, 
-        home_match_shots_against, home_match_shots_on_target_against,  
+        home_match_shots_against, home_match_shots_on_target_against, home_match_woodwork_against,  
         home_match_woodwork, home_match_corners, home_match_corners_against,  
         home_match_fouls, home_match_offsides, 
         home_match_yellow_card, home_match_red_card, 
@@ -384,7 +384,7 @@ def away_matches_training(away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 30  # Matching the number of features returned
+        return [0] * 31 # Matching the number of features returned
     
     num_matches = len(last_5)
 
@@ -491,7 +491,7 @@ def away_matches_training(away_team, all_data, before_date):
         away_match_clean_sheets,
         away_match_halftime_wins, away_match_halftime_losses, away_match_halftime_draws, 
         away_match_shots, away_match_shots_on_target, shot_accuracy, conversion_rate, 
-        away_match_shots_against, away_match_shots_on_target_against,  
+        away_match_shots_against, away_match_shots_on_target_against, away_match_woodwork_against,  
         away_match_woodwork, away_match_corners, away_match_corners_against,  
         away_match_fouls, away_match_offsides, 
         away_match_yellow_card, away_match_red_card, 

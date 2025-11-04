@@ -250,7 +250,6 @@ def head2head_training(home_team,away_team, all_data, before_date):
         H2H_bet365_probability_draws
     ]
 
-
 def home_matches_training(home_team, all_data, before_date):
     # Append the matches to the array where the home team is in the column HomeTeam
     home_matches = all_data[(all_data["HomeTeam"] == home_team) & (all_data["Date"] < before_date)]
@@ -260,65 +259,82 @@ def home_matches_training(home_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 23  # Or however many features you always expect
+        return [0] * 30  # Or however many features you always expect
+    
+    num_matches = len(last_5)
 
-    # Amount of times they win when playing at home
+    # Match results
     home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
-
-    # Home win rate percentage
     home_win_rate = home_match_wins / 5  # Last 5 matches
-
-    # Amount of times they lose when playing at home
     home_match_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
-
-    # Amount of they draw when playing at home 
     home_match_draws = (last_5['FTR'] == 'D').sum()
 
-    # Amount of half time goals when playing at home
+    # Goals scored
     home_match_halftime_goals = last_5[(last_5['HomeTeam'] == home_team)]['HTHG'].sum()
-
-    # Amount of full time goals when playing at home
     home_match_fulltime_goals = last_5[(last_5['HomeTeam'] == home_team)]['FTHG'].sum()
 
-    # Amount of times they are winning at half time when playing at home
+    # Goals conceded
+    home_match_goals_conceded = last_5['FTAG'].sum()
+    home_match_avg_goals_conceded = home_match_goals_conceded / num_matches
+
+    # Clean sheets (zero goals conceded)
+    home_match_clean_sheets = (last_5['FTAG'] == 0).sum()
+
+    # Halftime results
     home_match_halftime_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'H')].shape[0]
-
-    # Amount of times they are losing at half time when playing at home
     home_match_halftime_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'A')].shape[0]
-
-    # Amount of times they are drawing at half time when playing at home
     home_match_halftime_draws = (last_5['HTR'] == 'D').sum()
 
-    # Amount of times they shots they had when playing at home
+    # Shooting stats
     home_match_shots = last_5[(last_5['HomeTeam'] == home_team)]['HS'].sum()
-
-    # Amount of times they had shots on target when playing at home
     home_match_shots_on_target = last_5[(last_5['HomeTeam'] == home_team)]['HST'].sum()
-
-    # Efficiency metrics
     shot_accuracy = home_match_shots_on_target / home_match_shots if home_match_shots > 0 else 0
     conversion_rate = home_match_fulltime_goals / home_match_shots_on_target if home_match_shots_on_target > 0 else 0
 
-    # Amount of times they hit the woodwork when playing at home
+    # Opponents shots (defensive pressure)
+    home_match_shots_against = last_5['AS'].sum()
+    home_match_shots_on_target_against = last_5['AST'].sum()
+    home_match_woodwork_against = last_5['AHW'].sum()
+
+    # Woodwork
     home_match_woodwork = last_5[(last_5['HomeTeam'] == home_team)]['HHW'].sum()
 
-    # Amount of times they had a corner when playing at home
+    # Corners
     home_match_corners = last_5[(last_5['HomeTeam'] == home_team)]['HC'].sum()
 
-    # Amount of times they commited a foul when playing at home
+    # Corners against 
+    home_match_corners_against = last_5['AC'].sum()
+
+    # Discipline
     home_match_fouls = last_5[(last_5['HomeTeam'] == home_team)]['HF'].sum()
-
-    # Amount of times they were offside when playing at home
     home_match_offsides = last_5[(last_5['HomeTeam'] == home_team)]['HO'].sum()
-
-    # Amount of times they were given a yellow card when playing at home
     home_match_yellow_card = last_5[(last_5['HomeTeam'] == home_team)]['HY'].sum()
-
-    # Amount of times they were given a red card when playing at home
     home_match_red_card = last_5[(last_5['HomeTeam'] == home_team)]['HR'].sum()
 
     # Form indicator, recent points
-    recent_points = (home_match_wins * 3) + (home_match_draws * 1)
+    recent_points = (home_match_wins * 3) + home_match_draws
+
+    # Momentum indicator (weighted recent results)
+    if num_matches >= 3:
+        recent_results = []
+        # Index not needed so use "_" and row to get the data
+        for _, row in last_5.itterrows():
+            if row['FTR'] == 'H':
+                recent_results.append(3)
+            elif row['FTR'] == 'D':
+                recent_results.append(1)
+            else:
+                recent_results.append(0)
+        #Weight more recent matches higher, slice to get last num_matches
+        weights = [0.1, 0.15, 0.2, 0.25, 0.3][-num_matches:]
+        # Zip pairs each result with corresponding weight, for each pair result is multiplied by weight
+        # Dividing by the sum of weights normalizes the weights and then we get a weight averaged score
+        home_match_momentum = sum(r * w for r, w in zip(recent_results, weights)) / sum(weights)
+    else:
+        # We normalize by multiplying num_matches by 3 because you can get a max of 3 points per game
+        # Normalized score is always between 0 and 1.0
+        home_match_momentum = recent_points / (num_matches * 3) if num_matches > 0 else 0
+
 
     # Probability Bet365 hometeam wins
     subset_wins = last_5[(last_5["HomeTeam"] == home_team)]['B365H']
@@ -344,14 +360,21 @@ def home_matches_training(home_team, all_data, before_date):
         mean_val = subset_draws.mean()
         home_match_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
     
-
-    return [home_match_wins, home_win_rate, home_match_losses, home_match_draws, home_match_halftime_goals, 
-            home_match_fulltime_goals, home_match_halftime_wins, home_match_halftime_losses, 
-            home_match_halftime_draws, home_match_shots, home_match_shots_on_target, shot_accuracy, conversion_rate, 
-            home_match_woodwork, home_match_corners, home_match_fouls, home_match_offsides, home_match_yellow_card,
-            home_match_red_card, recent_points, home_match_bet365_probability_wins, 
-            home_match_bet365_probability_losses, home_match_bet365_probability_draws
-            ]
+    return [
+        home_match_wins, home_win_rate, home_match_losses, home_match_draws, 
+        home_match_halftime_goals, home_match_fulltime_goals, 
+        home_match_goals_conceded, home_match_avg_goals_conceded,  
+        home_match_clean_sheets,  
+        home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws, 
+        home_match_shots, home_match_shots_on_target, shot_accuracy, conversion_rate, 
+        home_match_shots_against, home_match_shots_on_target_against,  
+        home_match_woodwork, home_match_corners, home_match_corners_against,  
+        home_match_fouls, home_match_offsides, 
+        home_match_yellow_card, home_match_red_card, 
+        recent_points, home_match_momentum,  
+        home_match_bet365_probability_wins, home_match_bet365_probability_losses, 
+        home_match_bet365_probability_draws
+    ]
 
 def away_matches_training(away_team, all_data, before_date):
     # Append the matches to the array where the away team is in the column AwayTeam

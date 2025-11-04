@@ -335,7 +335,6 @@ def home_matches_training(home_team, all_data, before_date):
         # Normalized score is always between 0 and 1.0
         home_match_momentum = recent_points / (num_matches * 3) if num_matches > 0 else 0
 
-
     # Probability Bet365 hometeam wins
     subset_wins = last_5[(last_5["HomeTeam"] == home_team)]['B365H']
     if subset_wins.empty or subset_wins.isnull().all():
@@ -385,65 +384,81 @@ def away_matches_training(away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 23  # Matching the number of features returned
+        return [0] * 30  # Matching the number of features returned
+    
+    num_matches = len(last_5)
 
-    # Amount of times they win when playing away
+    # Match results
     away_match_wins = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'A')].shape[0]
-
-    # Away win rate percentage
-    away_win_rate = away_match_wins / 5  # Last 5 matches
-
-    # Amount of times they lose when playing away
+    away_win_rate = away_match_wins / num_matches
     away_match_losses = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'H')].shape[0]
-
-    # Amount of times they draw when playing away 
     away_match_draws = (last_5['FTR'] == 'D').sum()
 
-    # Amount of half time goals when playing away
+    # Goals scored
     away_match_halftime_goals = last_5[(last_5['AwayTeam'] == away_team)]['HTAG'].sum()
-
-    # Amount of full time goals when playing away
     away_match_fulltime_goals = last_5[(last_5['AwayTeam'] == away_team)]['FTAG'].sum()
 
-    # Amount of times they are winning at half time when playing away
+    # Goals conceded
+    away_match_goals_conceded = last_5['FTHG'].sum()
+    away_match_avg_goals_conceded = away_match_goals_conceded / num_matches
+
+    # Clean sheets (zero goals conceded)
+    away_match_clean_sheets = (last_5['FTHG'] == 0).sum()
+
+    # Half time results
     away_match_halftime_wins = last_5[(last_5['AwayTeam'] == away_team) & (last_5['HTR'] == 'A')].shape[0]
-
-    # Amount of times they are losing at half time when playing away
     away_match_halftime_losses = last_5[(last_5['AwayTeam'] == away_team) & (last_5['HTR'] == 'H')].shape[0]
-
-    # Amount of times they are drawing at half time when playing away
     away_match_halftime_draws = (last_5['HTR'] == 'D').sum()
 
-    # Amount of shots they had when playing away
+    # Shooting stats
     away_match_shots = last_5[(last_5['AwayTeam'] == away_team)]['AS'].sum()
-
-    # Amount of times they had shots on target when playing away
     away_match_shots_on_target = last_5[(last_5['AwayTeam'] == away_team)]['AST'].sum()
-
-    # Efficiency metrics
     shot_accuracy = away_match_shots_on_target / away_match_shots if away_match_shots > 0 else 0
     conversion_rate = away_match_fulltime_goals / away_match_shots_on_target if away_match_shots_on_target > 0 else 0
 
-    # Amount of times they hit the woodwork when playing away
+    # Opponents shots (defensive pressure)
+    away_match_shots_against = last_5['HS'].sum()
+    away_match_shots_on_target_against = last_5['HST'].sum()
+    away_match_woodwork_against = last_5['HHW'].sum()
+
+    # Woodwork
     away_match_woodwork = last_5[(last_5['AwayTeam'] == away_team)]['AHW'].sum()
 
-    # Amount of times they had a corner when playing away
+    # Corners
     away_match_corners = last_5[(last_5['AwayTeam'] == away_team)]['AC'].sum()
 
-    # Amount of times they committed a foul when playing away
+    # Corners against
+    away_match_corners_against = last_5['HC'].sum()
+
+    # Discipline
     away_match_fouls = last_5[(last_5['AwayTeam'] == away_team)]['AF'].sum()
-
-    # Amount of times they were offside when playing away
     away_match_offsides = last_5[(last_5['AwayTeam'] == away_team)]['AO'].sum()
-
-    # Amount of times they were given a yellow card when playing away
     away_match_yellow_card = last_5[(last_5['AwayTeam'] == away_team)]['AY'].sum()
-
-    # Amount of times they were given a red card when playing away
     away_match_red_card = last_5[(last_5['AwayTeam'] == away_team)]['AR'].sum()
 
     # Form indicator, recent points
-    recent_points = (away_match_wins * 3) + (away_match_draws * 1)
+    recent_points = (away_match_wins * 3) + away_match_draws
+
+    # Momentum indicator (weighted recent results)
+    if num_matches >= 3:
+        recent_results = []
+        # Index not needed so use "_" and row to get the data
+        for _, row in last_5.itterrows():
+            if row['FTR'] == 'A':
+                recent_results.append(3)
+            elif row['FTR'] == 'D':
+                recent_results.append(1)
+            else:
+                recent_results.append(0)
+        #Weight more recent matches higher, slice to get last num_matches
+        weights = [0.1, 0.15, 0.2, 0.25, 0.3][-num_matches:]
+        # Zip pairs each result with corresponding weight, for each pair result is multiplied by weight
+        # Dividing by the sum of weights normalizes the weights and then we get a weight averaged score
+        away_match_momentum = sum(r * w for r, w in zip(recent_results, weights)) / sum(weights)
+    else:
+        # We normalize by multiplying num_matches by 3 because you can get a max of 3 points per game
+        # Normalized score is always between 0 and 1.0
+        away_match_momentum = recent_points / (num_matches * 3) if num_matches > 0 else 0
 
     # Probability Bet365 awayteam wins
     subset_wins = last_5[(last_5["AwayTeam"] == away_team)]['B365A']
@@ -469,14 +484,21 @@ def away_matches_training(away_team, all_data, before_date):
         mean_val = subset_draws.mean()
         away_match_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
     
-
-    return [away_match_wins, away_win_rate, away_match_losses, away_match_draws, away_match_halftime_goals, 
-            away_match_fulltime_goals, away_match_halftime_wins, away_match_halftime_losses, 
-            away_match_halftime_draws, away_match_shots, away_match_shots_on_target, away_match_woodwork,
-            shot_accuracy, conversion_rate,away_match_corners, away_match_fouls, away_match_offsides, 
-            away_match_yellow_card, away_match_red_card,recent_points, away_match_bet365_probability_wins, 
-            away_match_bet365_probability_losses, away_match_bet365_probability_draws
-            ]
+    return [
+        away_match_wins, away_win_rate, away_match_losses, away_match_draws, 
+        away_match_halftime_goals, away_match_fulltime_goals, 
+        away_match_goals_conceded, away_match_avg_goals_conceded, 
+        away_match_clean_sheets,
+        away_match_halftime_wins, away_match_halftime_losses, away_match_halftime_draws, 
+        away_match_shots, away_match_shots_on_target, shot_accuracy, conversion_rate, 
+        away_match_shots_against, away_match_shots_on_target_against,  
+        away_match_woodwork, away_match_corners, away_match_corners_against,  
+        away_match_fouls, away_match_offsides, 
+        away_match_yellow_card, away_match_red_card, 
+        recent_points, away_match_momentum,  
+        away_match_bet365_probability_wins, away_match_bet365_probability_losses, 
+        away_match_bet365_probability_draws
+    ]
 
 # Training dataset
 X_train = []

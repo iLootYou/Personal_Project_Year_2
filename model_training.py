@@ -47,177 +47,145 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 32  # Or however many features you always expect
+        return [0] * 40  # Or however many features you always expect
+    
+    num_matches = len(last_5)
 
     # Shape[0] counts rows passing both filters, shape[1] gives columns and shape gives both
-    # Home team wins when playing at home
+    # Win/Draw/Loss stats
     H2H_hometeam_wins_home = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
-
-    # Home team wins when playing away
     H2H_hometeam_wins_away = last_5[(last_5['AwayTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
-
-    # Total wins of the hometeam
     H2H_hometeam_wins = H2H_hometeam_wins_home + H2H_hometeam_wins_away
 
-    # Away team wins when playing at home
     H2H_awayteam_wins_home = last_5[(last_5['HomeTeam'] == away_team) & (last_5['FTR'] == 'H')].shape[0]
-
-    # Away team wins when playing away
     H2H_awayteam_wins_away = last_5[(last_5['AwayTeam'] == away_team) & (last_5['FTR'] == 'A')].shape[0]
-
-    # Total wins of the awayteam
     H2H_awayteam_wins = H2H_awayteam_wins_home + H2H_awayteam_wins_away
 
-    # Draws count 
     H2H_draws = (last_5['FTR'] == 'D').sum()
-    #------------------------------------------------------------------------------------------------------------
+    
+    # Win percentages
+    H2H_hometeam_win_pct = H2H_hometeam_wins / num_matches  
+    H2H_awayteam_win_pct = H2H_awayteam_wins / num_matches
 
-    # Half time hometeam goals
+    # Half time goals
     H2H_hometeam_halftime_goals_home = last_5[(last_5['HomeTeam'] == home_team)]['HTHG'].sum()
     H2H_hometeam_halftime_goals_away = last_5[(last_5['AwayTeam'] == home_team)]['HTAG'].sum()
-
     H2H_hometeam_halftime_goals = H2H_hometeam_halftime_goals_home + H2H_hometeam_halftime_goals_away
 
-    # Half time awayteam goals
     H2H_awayteam_halftime_goals_home = last_5[(last_5['HomeTeam'] == away_team)]['HTHG'].sum()
     H2H_awayteam_halftime_goals_away = last_5[(last_5['AwayTeam'] == away_team)]['HTAG'].sum()
-
     H2H_awayteam_halftime_goals = H2H_awayteam_halftime_goals_home + H2H_awayteam_halftime_goals_away
-    #------------------------------------------------------------------------------------------------------------
 
-    # Full time hometeam goals
+    # Full time goals
     H2H_hometeam_fulltime_goals_home = last_5[(last_5['HomeTeam'] == home_team)]['FTHG'].sum()
     H2H_hometeam_fulltime_goals_away = last_5[(last_5['AwayTeam'] == home_team)]['FTAG'].sum()
-
     H2H_hometeam_fulltime_goals = H2H_hometeam_fulltime_goals_home + H2H_hometeam_fulltime_goals_away
 
-    # Full time awayteam goals
     H2H_awayteam_fulltime_goals_home = last_5[(last_5['HomeTeam'] == away_team)]['FTHG'].sum()
     H2H_awayteam_fulltime_goals_away = last_5[(last_5['AwayTeam'] == away_team)]['FTAG'].sum()
-
     H2H_awayteam_fulltime_goals = H2H_awayteam_fulltime_goals_home + H2H_awayteam_fulltime_goals_away
 
     # Goal difference
     H2H_goal_diff = H2H_hometeam_fulltime_goals - H2H_awayteam_fulltime_goals
-    #------------------------------------------------------------------------------------------------------------
+
+    # Average goals per match
+    H2H_hometeam_avg_goals = H2H_hometeam_fulltime_goals / num_matches
+    H2H_awayteam_avg_goals = H2H_awayteam_fulltime_goals / num_matches
+
+    # Goals conceded
+    H2H_hometeam_goals_conceded = H2H_awayteam_fulltime_goals
+    H2H_awayteam_goals_conceded = H2H_hometeam_fulltime_goals
 
     # Half time results
     H2H_hometeam_halftime_wins_home = last_5[(last_5['HomeTeam'] == home_team) & (last_5['HTR'] == 'H')].shape[0]
     H2H_hometeam_halftime_wins_away = last_5[(last_5['AwayTeam'] == home_team) & (last_5['HTR'] == 'A')].shape[0]
-
     H2H_hometeam_halftime_wins = H2H_hometeam_halftime_wins_home + H2H_hometeam_halftime_wins_away
 
     H2H_awayteam_halftime_wins_home = last_5[(last_5['HomeTeam'] == away_team) & (last_5['HTR'] == 'H')].shape[0]
     H2H_awayteam_halftime_wins_away = last_5[(last_5['AwayTeam'] == away_team) & (last_5['HTR'] == 'A')].shape[0]
-
     H2H_awayteam_halftime_wins = H2H_awayteam_halftime_wins_home + H2H_awayteam_halftime_wins_away
 
     H2H_halftime_draws = (last_5['HTR'] == 'D').sum()
-    #------------------------------------------------------------------------------------------------------------
 
-    # Total shots taken hometeam
+
+    # Total shots taken 
     H2H_hometeam_shots_home = last_5[(last_5['HomeTeam'] == home_team)]['HS'].sum()
     H2H_hometeam_shots_away = last_5[(last_5['AwayTeam'] == home_team)]['AS'].sum()
-
     H2H_hometeam_shots = H2H_hometeam_shots_home + H2H_hometeam_shots_away
 
-    # Total shots taken awayteam
     H2H_awayteam_shots_home = last_5[(last_5['HomeTeam'] == away_team)]['HS'].sum()
     H2H_awayteam_shots_away = last_5[(last_5['AwayTeam'] == away_team)]['AS'].sum()
-
     H2H_awayteam_shots = H2H_awayteam_shots_home + H2H_awayteam_shots_away
-    #------------------------------------------------------------------------------------------------------------
 
-    # Total shots on target hometeam
+    # Total shots on target 
     H2H_hometeam_shots_on_target_home = last_5[(last_5['HomeTeam'] == home_team)]['HST'].sum()
     H2H_hometeam_shots_on_target_away = last_5[(last_5['AwayTeam'] == home_team)]['AST'].sum()
-
     H2H_hometeam_shots_on_target = H2H_hometeam_shots_on_target_home + H2H_hometeam_shots_on_target_away
 
-    # Total shots on target awayteam
     H2H_awayteam_shots_on_target_home = last_5[(last_5['HomeTeam'] == away_team)]['HST'].sum()
     H2H_awayteam_shots_on_target_away = last_5[(last_5['AwayTeam'] == away_team)]['AST'].sum()
-
     H2H_awayteam_shots_on_target = H2H_awayteam_shots_on_target_home + H2H_awayteam_shots_on_target_away
-    #------------------------------------------------------------------------------------------------------------
 
-    # Total woodwork hits hometeam
+    # Shot accuracy and conversion
+    H2H_hometeam_shot_accuracy = H2H_hometeam_shots_on_target / H2H_hometeam_shots if H2H_hometeam_shots > 0 else 0
+    H2H_awayteam_shot_accuracy = H2H_awayteam_shots_on_target / H2H_awayteam_shots if H2H_awayteam_shots > 0 else 0
+    
+    H2H_hometeam_conversion = H2H_hometeam_fulltime_goals / H2H_hometeam_shots_on_target if H2H_hometeam_shots_on_target > 0 else 0
+    H2H_awayteam_conversion = H2H_awayteam_fulltime_goals / H2H_awayteam_shots_on_target if H2H_awayteam_shots_on_target > 0 else 0
+
+    # Total woodwork hits 
     H2H_hometeam_woodwork_home = last_5[(last_5['HomeTeam'] == home_team)]['HHW'].sum()
     H2H_hometeam_woodwork_away = last_5[(last_5['AwayTeam'] == home_team)]['AHW'].sum()
-
     H2H_hometeam_woodwork = H2H_hometeam_woodwork_home + H2H_hometeam_woodwork_away
 
-    # Total woodwork hits awayteam
     H2H_awayteam_woodwork_home = last_5[(last_5['HomeTeam'] == away_team)]['HHW'].sum()
     H2H_awayteam_woodwork_away = last_5[(last_5['AwayTeam'] == away_team)]['AHW'].sum()
-
     H2H_awayteam_woodwork = H2H_awayteam_woodwork_home + H2H_awayteam_woodwork_away
-    #------------------------------------------------------------------------------------------------------------
 
-    # Total corners for hometeam
+    # Total corners
     H2H_hometeam_corners_home = last_5[(last_5['HomeTeam'] == home_team)]['HC'].sum()
     H2H_hometeam_corners_away = last_5[(last_5['AwayTeam'] == home_team)]['AC'].sum()
-
     H2H_hometeam_corners = H2H_hometeam_corners_home + H2H_hometeam_corners_away
 
-    # Total corners for awayteam
     H2H_awayteam_corners_home = last_5[(last_5['HomeTeam'] == away_team)]['HC'].sum()
     H2H_awayteam_corners_away = last_5[(last_5['AwayTeam'] == away_team)]['AC'].sum()
-
     H2H_awayteam_corners = H2H_awayteam_corners_home + H2H_awayteam_corners_away
-    #------------------------------------------------------------------------------------------------------------
 
-    # Total fouls for hometeam
+    # Total fouls 
     H2H_hometeam_fouls_home = last_5[(last_5['HomeTeam'] == home_team)]['HF'].sum()
     H2H_hometeam_fouls_away = last_5[(last_5['AwayTeam'] == home_team)]['AF'].sum()
-
     H2H_hometeam_fouls = H2H_hometeam_fouls_home + H2H_hometeam_fouls_away
 
-    # Total fouls for awayteam
     H2H_awayteam_fouls_home = last_5[(last_5['HomeTeam'] == away_team)]['HF'].sum()
     H2H_awayteam_fouls_away = last_5[(last_5['AwayTeam'] == away_team)]['AF'].sum()
-
     H2H_awayteam_fouls = H2H_awayteam_fouls_home + H2H_awayteam_fouls_away
-    #------------------------------------------------------------------------------------------------------------
-
-    # Total offsides for hometeam
+  
+    # Total offsides 
     H2H_hometeam_offside_home = last_5[(last_5['HomeTeam'] == home_team)]['HO'].sum()
     H2H_hometeam_offside_away = last_5[(last_5['AwayTeam'] == home_team)]['AO'].sum()
-
     H2H_hometeam_offsides = H2H_hometeam_offside_home + H2H_hometeam_offside_away
 
-    # Total offsides for awayteam
     H2H_awayteam_offside_home = last_5[(last_5['HomeTeam'] == away_team)]['HO'].sum()
     H2H_awayteam_offside_away = last_5[(last_5['AwayTeam'] == away_team)]['AO'].sum()
-
     H2H_awayteam_offsides = H2H_awayteam_offside_home + H2H_awayteam_offside_away
-    #------------------------------------------------------------------------------------------------------------
 
-    # Total yellow cards for hometeam
+    # Total yellow cards
     H2H_hometeam_yellow_card_home = last_5[(last_5['HomeTeam'] == home_team)]['HY'].sum()
     H2H_hometeam_yellow_card_away = last_5[(last_5['AwayTeam'] == home_team)]['AY'].sum()
-
     H2H_hometeam_yellow_card = H2H_hometeam_yellow_card_home + H2H_hometeam_yellow_card_away
 
-    # Total yellow cards for awayteam
     H2H_awayteam_yellow_card_home = last_5[(last_5['HomeTeam'] == away_team)]['HY'].sum()
     H2H_awayteam_yellow_card_away = last_5[(last_5['AwayTeam'] == away_team)]['AY'].sum()
-
     H2H_awayteam_yellow_card = H2H_awayteam_yellow_card_home + H2H_awayteam_yellow_card_away  
-    #------------------------------------------------------------------------------------------------------------ 
 
-    # Total red cars for hometeam
+    # Total red cards
     H2H_hometeam_red_card_home = last_5[(last_5['HomeTeam'] == home_team)]['HR'].sum()
     H2H_hometeam_red_card_away = last_5[(last_5['AwayTeam'] == home_team)]['AR'].sum()
-
     H2H_hometeam_red_card = H2H_hometeam_red_card_home + H2H_hometeam_red_card_away 
 
-    # Total red cars for awayteam
     H2H_awayteam_red_card_home = last_5[(last_5['HomeTeam'] == away_team)]['HR'].sum()
     H2H_awayteam_red_card_away = last_5[(last_5['AwayTeam'] == away_team)]['AR'].sum()
-
     H2H_awayteam_red_card = H2H_awayteam_red_card_home + H2H_awayteam_red_card_away
-    #------------------------------------------------------------------------------------------------------------ 
 
     # For HomeTeam home odds
     subset_home = last_5[(last_5['HomeTeam'] == home_team)]['B365H']
@@ -259,18 +227,28 @@ def head2head_training(home_team,away_team, all_data, before_date):
         mean_val = subset_draws.mean()
         H2H_bet365_probability_draws = 1 / mean_val if mean_val and not np.isnan(mean_val) else 0
 
-
-    return [H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, H2H_hometeam_halftime_goals, 
-            H2H_awayteam_halftime_goals, H2H_hometeam_fulltime_goals, H2H_awayteam_fulltime_goals, H2H_goal_diff,  
-            H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws, H2H_hometeam_shots,
-            H2H_awayteam_shots, H2H_hometeam_shots_on_target, H2H_awayteam_shots_on_target, H2H_hometeam_woodwork,
-            H2H_awayteam_woodwork, H2H_hometeam_corners, H2H_awayteam_corners, H2H_hometeam_fouls, 
-            H2H_awayteam_fouls, H2H_hometeam_offsides, H2H_awayteam_offsides, H2H_hometeam_yellow_card,
-            H2H_awayteam_yellow_card, H2H_hometeam_red_card, H2H_awayteam_red_card, 
-            H2H_bet365_hometeam_probability_home, H2H_bet365_hometeam_probability_away,
-            H2H_bet365_awayteam_probability_home, H2H_bet365_awayteam_probability_away,
-            H2H_bet365_probability_draws
-            ]
+    return [
+        H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, 
+        H2H_hometeam_win_pct, H2H_awayteam_win_pct,  
+        H2H_hometeam_halftime_goals, H2H_awayteam_halftime_goals, 
+        H2H_hometeam_fulltime_goals, H2H_awayteam_fulltime_goals, 
+        H2H_goal_diff, H2H_hometeam_avg_goals, H2H_awayteam_avg_goals,  
+        H2H_hometeam_goals_conceded, H2H_awayteam_goals_conceded,  
+        H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws, 
+        H2H_hometeam_shots, H2H_awayteam_shots, 
+        H2H_hometeam_shots_on_target, H2H_awayteam_shots_on_target, 
+        H2H_hometeam_shot_accuracy, H2H_awayteam_shot_accuracy,  
+        H2H_hometeam_conversion, H2H_awayteam_conversion,  
+        H2H_hometeam_woodwork, H2H_awayteam_woodwork, 
+        H2H_hometeam_corners, H2H_awayteam_corners, 
+        H2H_hometeam_fouls, H2H_awayteam_fouls, 
+        H2H_hometeam_offsides, H2H_awayteam_offsides, 
+        H2H_hometeam_yellow_card, H2H_awayteam_yellow_card, 
+        H2H_hometeam_red_card, H2H_awayteam_red_card, 
+        H2H_bet365_hometeam_probability_home, H2H_bet365_hometeam_probability_away,
+        H2H_bet365_awayteam_probability_home, H2H_bet365_awayteam_probability_away,
+        H2H_bet365_probability_draws
+    ]
 
 
 def home_matches_training(home_team, all_data, before_date):

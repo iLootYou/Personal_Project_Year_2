@@ -318,7 +318,7 @@ def home_matches_training(home_team, all_data, before_date):
     if num_matches >= 3:
         recent_results = []
         # Index not needed so use "_" and row to get the data
-        for _, row in last_5.itterrows():
+        for _, row in last_5.iterrows():
             if row['FTR'] == 'H':
                 recent_results.append(3)
             elif row['FTR'] == 'D':
@@ -443,7 +443,7 @@ def away_matches_training(away_team, all_data, before_date):
     if num_matches >= 3:
         recent_results = []
         # Index not needed so use "_" and row to get the data
-        for _, row in last_5.itterrows():
+        for _, row in last_5.iterrows():
             if row['FTR'] == 'A':
                 recent_results.append(3)
             elif row['FTR'] == 'D':

@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import glob
 import pickle
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
+import optuna
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 import xgboost as xgb
 import lightgbm as lgb
@@ -556,6 +557,96 @@ def data_normalization(X_train_split, X_test_split):
 # Training the model
 print("Training the model..")
 
+def objective(trial):
+    tree__n_estimators = trial.suggest_int("tree__n_estimators", 50, 500)      # Number of trees
+    tree__max_depth = trial.suggest_int("tree__max_depth", 5, 50)           # Maximum depth of each tree
+    tree__min_samples_split = trial.suggest_int("tree__min_samples_split", 2, 20)   # Minimum number of samples needed to split node
+    tree__min_samples_leaf = trial.suggest_int("tree__min_samples_leaf", 1, 5)     # Minimum number of samples needed at leaf node
+    
+    xgb__n_estimators = trial.suggest_int("xgb__n_estimators", 50, 200)      # Number of boosting rounds
+    xgb__max_depth = trial.suggest_int("xgb__max_depth", 3, 7)            # Maximum depth of each tree
+    xgb__learning_rate = trial.suggest_float("xgb__learning_rate", 0.01, 0.2)   # Step size shrinkage for update to prevent overfitting
+    xgb__subsample = trial.suggest_float("xgb__subsample", 0.7, 1.0)          # Fraction of samples used per tree
+    xgb__colsample_bytree = trial.suggest_float("xgb__colsample_bytree", 0.7, 1.0)   # Fraction of features used per tree
+
+    # Instantiate base models with suggested parameters
+    tree_clf = RandomForestClassifier(
+        n_estimators=tree__n_estimators,
+        max_depth=tree__max_depth,
+        min_samples_split=tree__min_samples_split,
+        min_samples_leaf=tree__min_samples_leaf,
+        random_state=42,
+        class_weight='balanced'
+    )
+
+    xgb_clf = xgb.XGBClassifier(
+        n_estimators=xgb__n_estimators,
+        max_depth=xgb__max_depth,
+        learning_rate=xgb__learning_rate,
+        subsample=xgb__subsample,
+        colsample_bytree=xgb__colsample_bytree,
+    )
+
+    base_models = [
+        ('tree', tree_clf),
+        ('xgb', xgb_clf)
+    ]
+
+    voting_clf = VotingClassifier(
+        estimators= base_models,
+            voting= 'soft', 
+            n_jobs= -1
+    )
+
+    score = cross_val_score(voting_clf, X_train_split, y_train_split, cv=5, scoring="accuracy").mean()
+    return score
+
+def study(X_train_split, y_train_split, X_test_split, y_test_split):
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=50)
+
+    print("Best trial:")
+    trial = study.best_trial
+    print(f"  Accuracy: {trial.value}")
+    print("  Params:")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")
+
+    best_params = study.best_params
+
+    tree_clf = RandomForestClassifier(
+        n_estimators=best_params["tree__n_estimators"],
+        max_depth=best_params["tree__max_depth"],
+        min_samples_split=best_params["tree__min_samples_split"],
+        min_samples_leaf=best_params["tree__min_samples_leaf"],
+        random_state=42,
+        class_weight='balanced'
+    )
+
+    xgb_clf = xgb.XGBClassifier(
+        n_estimators=best_params["xgb__n_estimators"],
+        max_depth=best_params["xgb__max_depth"],
+        learning_rate=best_params["xgb__learning_rate"],
+        subsample=best_params["xgb__subsample"],
+        colsample_bytree=best_params["xgb__colsample_bytree"],
+    )
+
+    ensemble = VotingClassifier(
+        estimators=[
+            ("tree", tree_clf),
+            ("xgb", xgb_clf)
+        ],
+        voting="soft",
+        n_jobs=-1
+    )
+
+    # Fit ensemble with training data
+    ensemble.fit(X_train_split, y_train_split)
+
+    # Predict
+    y_pred = ensemble.predict(X_test_split)
+    print(f"Test Accuracy: {accuracy_score(y_test_split, y_pred):.4f}")
+
 def prediction_model(y_train_split, X_train_scaled, X_test_scaled):
     # Define base models
     base_models = [
@@ -578,8 +669,8 @@ def prediction_model(y_train_split, X_train_scaled, X_test_scaled):
         'xgb__n_estimators': randint(50, 200),       # Number of boosting rounds
         'xgb__max_depth': randint(3, 7),             # Maximum depth of each tree
         'xgb__learning_rate': uniform(0.01, 0.2),    # Step size shrinkage for update to prevent overfitting
-        'xgb__subsample': uniform(0.7, 1.0),         # Fraction of samples used per tree
-        'xgb__colsample_bytree': uniform(0.7, 1.0)   # Fraction of features used per tree
+        'xgb__subsample': uniform(0.7, 0.3),         # Fraction of samples used per tree
+        'xgb__colsample_bytree': uniform(0.7, 0.3)   # Fraction of features used per tree
     }
 
     # Grid search for hyperparameter tuning
@@ -629,8 +720,9 @@ def data_visualization(best_model, y_pred, X_test_scaled, y_test_split):
 if __name__ == "__main__":
     X_train_split, X_test_split, y_train_split, y_test_split = process_data()
     X_train_scaled, X_test_scaled = data_normalization(X_train_split, X_test_split)
-    best_model, y_pred = prediction_model(y_train_split, X_train_scaled, X_test_scaled)
-    data_visualization(best_model, y_pred, X_test_scaled, y_test_split)
+    study(X_train_split, y_train_split, X_test_split, y_test_split)
+    #best_model, y_pred = prediction_model(y_train_split, X_train_scaled, X_test_scaled)
+    #data_visualization(best_model, y_pred, X_test_scaled, y_test_split)
 
 
 # Save the model

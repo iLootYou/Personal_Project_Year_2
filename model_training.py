@@ -3,13 +3,13 @@ import numpy as np
 import glob
 import pickle
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.svm import SVR, SVC
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+import xgboost as xgb
+import lightgbm as lgb
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from imblearn.over_sampling import SMOTE
 from collections import Counter
-from scipy.stats import randint
+from scipy.stats import randint, uniform
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -47,7 +47,7 @@ def head2head_training(home_team,away_team, all_data, before_date):
 
     if len(last_5) == 0:
         # Return a zeroed list matching the full feature count
-        return [0] * 40  # Or however many features you always expect
+        return [0] * 42  # Or however many features you always expect
     
     num_matches = len(last_5)
 
@@ -500,175 +500,138 @@ def away_matches_training(away_team, all_data, before_date):
         away_match_bet365_probability_draws
     ]
 
-# Training dataset
-X_train = []
-y_train = []
+def process_data():
+    # Training dataset
+    X_train = []
+    y_train = []
 
-# idx = the index row number, match is the actual row data and iterrows() loops through each row in the df
-for idx, match in all_data.iterrows():
-    # To show that we are processing the data each 100 matches
-    if idx % 100 == 0:
-        print(f"Processing match data {idx}/{len(all_data)}")
+    # idx = the index row number, match is the actual row data and iterrows() loops through each row in the df
+    for idx, match in all_data.iterrows():
+        # To show that we are processing the data each 100 matches
+        if idx % 100 == 0:
+            print(f"Processing match data {idx}/{len(all_data)}")
+        
+        # Extracting the match data
+        home_team = match["HomeTeam"]
+        away_team = match["AwayTeam"]
+        match_date = match["Date"]
+        outcome = match["FTR"]
+
+        # Get the features using data before this match
+        h2h_stats = head2head_training(home_team, away_team, all_data, match_date)
+        home_stats = home_matches_training(home_team, all_data, match_date)
+        away_stats = away_matches_training(away_team, all_data, match_date)
+
+        # Only include matches with historical data
+        if sum(h2h_stats) > 0 or sum(home_stats) > 0 or sum(away_stats) > 0:
+            features = h2h_stats + home_stats + away_stats
+            X_train.append(features)
+            y_train.append(mapping[outcome])
+        
+    # Converting to NumPy arrays
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
+
+    print("Training dataset created")
+    print("Original class distribution:", Counter(y_train))
+
+    # Split into training and test data 
+    X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
+        X_train, y_train, test_size=0.2, random_state=42)
     
-    # Extracting the match data
-    home_team = match["HomeTeam"]
-    away_team = match["AwayTeam"]
-    match_date = match["Date"]
-    outcome = match["FTR"]
+    return X_train_split, X_test_split, y_train_split, y_test_split
 
-    # Get the features using data before this match
-    h2h_stats = head2head_training(home_team, away_team, all_data, match_date)
-    home_stats = home_matches_training(home_team, all_data, match_date)
-    away_stats = away_matches_training(away_team, all_data, match_date)
+def data_normalization(X_train_split, X_test_split):
+    # Normalize data for models 
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_split)
+    X_test_scaled = scaler.transform(X_test_split)
 
-    # Only include matches with historical data
-    if sum(h2h_stats) > 0 or sum(home_stats) > 0 or sum(away_stats) > 0:
-        features = h2h_stats + home_stats + away_stats
-        X_train.append(features)
-        y_train.append(mapping[outcome])
-    
-# Converting to NumPy arrays, because scikit learn requires it 
-X_train = np.array(X_train)
-y_train = np.array(y_train)
-
-print("Training dataset created")
-print("Original class distribution:", Counter(y_train))
-
-# Split into training and test data 
-X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(
-    X_train, y_train, test_size=0.2, random_state=42)
-
-# Normalize data for models 
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train_split)
-X_test_scaled = scaler.transform(X_test_split)
-
-# Synthetic minority oversampeling technique
-print("Before SMOTE:", Counter(y_train_split))
-smote = SMOTE(random_state=42)
-X_smote, y_smote = smote.fit_resample(X_train_split, y_train_split)
-print("After SMOTE:", Counter(y_smote))
+    return X_train_scaled, X_test_scaled
 
 # fit_transform on the train data to calculate the parameters and immediately apply the transformation
 # To avoid data leakage we dont fit the test data but just apply the transformation, otherwise it would recalculate
 # Now we ensure that the test data is scaled consistently.
 
-
 # Training the model
 print("Training the model..")
 
-# RandomForest
-model = RandomForestClassifier(random_state=42, class_weight='balanced')
+def prediction_model(y_train_split, X_train_scaled, X_test_scaled):
+    # Define base models
+    base_models = [
+        ('tree', RandomForestClassifier(random_state=42, class_weight='balanced')),
+        ('xgb', xgb.XGBClassifier())
+    ] 
 
-param_grid = {
-    'n_estimators': randint(50, 500),      # Number of trees
-    'max_depth': randint(5, 50),           # Maximum depth of each tree
-    'min_samples_split': randint(2, 20),   # Minimum number of samples needed to split node
-    'min_samples_leaf': randint(1, 5)      # Minimum number of samples needed at leaf node
-}
+    voting_clf = VotingClassifier(
+        estimators= base_models,
+            voting= 'soft', 
+            n_jobs= -1
+    )
 
-# Grid search for hyperparameter tuning
-grid_search = RandomizedSearchCV(estimator=model,param_distributions=param_grid, cv=5,
-                           scoring="accuracy")
+    param_grid = {
+        'tree__n_estimators': randint(50, 500),      # Number of trees
+        'tree__max_depth': randint(5, 50),           # Maximum depth of each tree
+        'tree__min_samples_split': randint(2, 20),   # Minimum number of samples needed to split node
+        'tree__min_samples_leaf': randint(1, 5),     # Minimum number of samples needed at leaf node
+        
+        'xgb__n_estimators': randint(50, 200),       # Number of boosting rounds
+        'xgb__max_depth': randint(3, 7),             # Maximum depth of each tree
+        'xgb__learning_rate': uniform(0.01, 0.2),    # Step size shrinkage for update to prevent overfitting
+        'xgb__subsample': uniform(0.7, 1.0),         # Fraction of samples used per tree
+        'xgb__colsample_bytree': uniform(0.7, 1.0)   # Fraction of features used per tree
+    }
 
-# Fitting the model
-grid_search.fit(X_train_scaled, y_train_split)
+    # Grid search for hyperparameter tuning
+    grid_search = RandomizedSearchCV(estimator=voting_clf,param_distributions=param_grid, cv=5,
+                            scoring="accuracy")
 
-print("Best parameters found:", grid_search.best_params_)
-# Best parameters found: {'n_estimators': 200, 'min_samples_split': 10, 'min_samples_leaf': 1, 'max_depth': 30}
-# Model accuracy: 52.08%
+    # Fitting the model
+    grid_search.fit(X_train_scaled, y_train_split)
 
-# Getting the best model from the search
-best_model = grid_search.best_estimator_
+    print("Best parameters found:", grid_search.best_params_)
+    # Best parameters found: {'n_estimators': 200, 'min_samples_split': 10, 'min_samples_leaf': 1, 'max_depth': 30}
+    # Model accuracy: 52.08%
 
-# Predictions on the set
-y_pred = best_model.predict(X_test_scaled)
+    # Getting the best model from the search
+    best_model = grid_search.best_estimator_
 
-"""
-# Support Vector Machine (SVM)
+    # Predictions on the set
+    y_pred = best_model.predict(X_test_scaled)
 
-model = SVC(class_weight='balanced')
+    return best_model, y_pred
 
-# Grid search for hyperparameter tuning
-param_grid = {
-    'C': [0.01, 0.1, 1, 10, 100],         # Control tradeoff between maximizing and minimizing classification error
-    'gamma': [0.01, 0.1, 1, 10, 100],     # Determines the influence of single training examples
-    'kernel': ['linear', 'rbf']           # Defines function used to transform data into higher dimensions
-}
+def data_visualization(best_model, y_pred, X_test_scaled, y_test_split):
+    # Evaluation
+    accuracy = best_model.score(X_test_scaled, y_test_split)
+    print(f"Model accuracy: {accuracy:.2%}")
 
-grid_search = RandomizedSearchCV(estimator=model, param_distributions=param_grid, cv=5,
-                           scoring="accuracy")
+    # Classification
+    print("Classification Report")
+    print(classification_report(y_test_split, y_pred, target_names=["Home Win", "Draw", "Away Win"]))
 
-# Fitting the model
-grid_search.fit(X_train_scaled, y_train_split)
+    # Confusion matrix
+    print("Confusion Matrix:")
+    cm = confusion_matrix(y_test_split, y_pred)
+    print(cm)
 
-print("Best parameters found:", grid_search.best_params_)
+    # Vizualization of confusion matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                xticklabels=["Home Win", "Draw", "Away Win"],
+                yticklabels=["Home Win", "Draw", "Away Win"])
+    plt.ylabel("ACTUAL")
+    plt.xlabel("PREDICTED")
+    plt.title("Confusion Matrix")
+    plt.show()
 
-# Getting the best model from the search
-best_model = grid_search.best_estimator_
 
-# Predictions on the set
-y_pred = best_model.predict(X_test_scaled)
-"""
-"""
-# Gradient boost
+if __name__ == "__main__":
+    X_train_split, X_test_split, y_train_split, y_test_split = process_data()
+    X_train_scaled, X_test_scaled = data_normalization(X_train_split, X_test_split)
+    best_model, y_pred = prediction_model(y_train_split, X_train_scaled, X_test_scaled)
+    data_visualization(best_model, y_pred, X_test_scaled, y_test_split)
 
-model = GradientBoostingClassifier(random_state=42)
-
-param_grid = {
-    'n_estimators': [50, 100, 200],         # Number of trees
-    'max_depth': [None, 1, 2, 4, 6, 8],     # complexity of each tree
-    'learning_rate': [0.01, 0.1, 1]         # shrinkage step               
-}
-
-grid_search = RandomizedSearchCV(estimator=model, param_distributions=param_grid, cv=5,
-                           scoring="accuracy")
-
-# Fitting the model
-grid_search.fit(X_train_split, y_train_split)
-
-print("Best parameters found:", grid_search.best_params_)
-
-best_model = grid_search.best_estimator_
-
-# Predictions on the set
-y_pred = best_model.predict(X_test_split)
-"""
-
-"""
-Accuracy: Overall percentage of correct predictions.
-    If accuracy is 50%, the model is right half the time.
-Precision: Of all matches predicted as "Home Win", how many were actually Home Wins?
-    High precision = few false alarms.
-Recall: Of all actual "Home Wins", how many did we predict correctly?
-    High recall = we don't miss many.
-F1-Score: Balance between precision and recall.
-    Good overall measure for each class.
-Confusion Matrix: Shows where the model gets confused
-"""
-
-# Evaluation
-accuracy = best_model.score(X_test_scaled, y_test_split)
-print(f"Model accuracy: {accuracy:.2%}")
-
-# Classification
-print("Classification Report")
-print(classification_report(y_test_split, y_pred, target_names=["Home Win", "Draw", "Away Win"]))
-
-# Confusion matrix
-print("Confusion Matrix:")
-cm = confusion_matrix(y_test_split, y_pred)
-print(cm)
-
-# Vizualization of confusion matrix
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-            xticklabels=["Home Win", "Draw", "Away Win"],
-            yticklabels=["Home Win", "Draw", "Away Win"])
-plt.ylabel("ACTUAL")
-plt.xlabel("PREDICTED")
-plt.title("Confusion Matrix")
-plt.show()
 
 # Save the model
 #with open('match_predictor.pkl', 'wb') as f:

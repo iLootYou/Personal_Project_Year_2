@@ -501,6 +501,239 @@ def away_matches_training(away_team, all_data, before_date):
         away_match_bet365_probability_draws
     ]
 
+def feature_interactions(h2h_stats, home_stats, away_stats):
+    # Unpack h2h_stats (42 features)
+    (H2H_hometeam_wins, H2H_awayteam_wins, H2H_draws, 
+     H2H_hometeam_win_pct, H2H_awayteam_win_pct,  
+     H2H_hometeam_halftime_goals, H2H_awayteam_halftime_goals, 
+     H2H_hometeam_fulltime_goals, H2H_awayteam_fulltime_goals, 
+     H2H_goal_diff, H2H_hometeam_avg_goals, H2H_awayteam_avg_goals,  
+     H2H_hometeam_goals_conceded, H2H_awayteam_goals_conceded,  
+     H2H_hometeam_halftime_wins, H2H_awayteam_halftime_wins, H2H_halftime_draws, 
+     H2H_hometeam_shots, H2H_awayteam_shots, 
+     H2H_hometeam_shots_on_target, H2H_awayteam_shots_on_target, 
+     H2H_hometeam_shot_accuracy, H2H_awayteam_shot_accuracy,  
+     H2H_hometeam_conversion, H2H_awayteam_conversion,  
+     H2H_hometeam_woodwork, H2H_awayteam_woodwork, 
+     H2H_hometeam_corners, H2H_awayteam_corners, 
+     H2H_hometeam_fouls, H2H_awayteam_fouls, 
+     H2H_hometeam_offsides, H2H_awayteam_offsides, 
+     H2H_hometeam_yellow_card, H2H_awayteam_yellow_card, 
+     H2H_hometeam_red_card, H2H_awayteam_red_card, 
+     H2H_bet365_hometeam_probability_home, H2H_bet365_hometeam_probability_away,
+     H2H_bet365_awayteam_probability_home, H2H_bet365_awayteam_probability_away,
+     H2H_bet365_probability_draws) = h2h_stats
+    
+    # Unpack home_stats (31 features)
+    (home_match_wins, home_win_rate, home_match_losses, home_match_draws, 
+     home_match_halftime_goals, home_match_fulltime_goals, 
+     home_match_goals_conceded, home_match_avg_goals_conceded,  
+     home_match_clean_sheets,  
+     home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws, 
+     home_match_shots, home_match_shots_on_target, home_shot_accuracy, home_conversion_rate, 
+     home_match_shots_against, home_match_shots_on_target_against, home_match_woodwork_against,  
+     home_match_woodwork, home_match_corners, home_match_corners_against,  
+     home_match_fouls, home_match_offsides, 
+     home_match_yellow_card, home_match_red_card, 
+     home_recent_points, home_match_momentum,  
+     home_match_bet365_probability_wins, home_match_bet365_probability_losses, 
+     home_match_bet365_probability_draws) = home_stats
+    
+    # Unpack away_stats (31 features)
+    (away_match_wins, away_win_rate, away_match_losses, away_match_draws, 
+     away_match_halftime_goals, away_match_fulltime_goals, 
+     away_match_goals_conceded, away_match_avg_goals_conceded, 
+     away_match_clean_sheets,
+     away_match_halftime_wins, away_match_halftime_losses, away_match_halftime_draws, 
+     away_match_shots, away_match_shots_on_target, away_shot_accuracy, away_conversion_rate, 
+     away_match_shots_against, away_match_shots_on_target_against, away_match_woodwork_against,  
+     away_match_woodwork, away_match_corners, away_match_corners_against,  
+     away_match_fouls, away_match_offsides, 
+     away_match_yellow_card, away_match_red_card, 
+     away_recent_points, away_match_momentum,  
+     away_match_bet365_probability_wins, away_match_bet365_probability_losses, 
+     away_match_bet365_probability_draws) = away_stats
+
+    # Difference in momentum
+    momentum_difference = home_match_momentum - away_match_momentum
+
+    # Combined momentum score
+    combined_momentum = (home_match_momentum + away_match_momentum) / 2
+
+    # Difference in points
+    form_points_difference = home_recent_points - away_recent_points
+
+    # Win rate difference 
+    win_rate_difference = home_win_rate - away_win_rate
+
+    # H2H win percantage difference
+    H2H_win_pct_difference = H2H_hometeam_win_pct - H2H_awayteam_win_pct
+
+    # Home attack vs away defense
+    home_attack_vs_away_defense = home_match_fulltime_goals - away_match_goals_conceded
+
+    # Away attack vs home defense
+    away_attack_vs_home_defense = away_match_fulltime_goals - home_match_goals_conceded
+
+    # Goal scoring difference
+    goal_scoring_difference = home_match_fulltime_goals - away_match_fulltime_goals
+
+    # Average goals concede difference
+    goals_conceded_difference = home_match_avg_goals_conceded - away_match_avg_goals_conceded
+
+    # Clean sheet difference
+    clean_sheet_difference = home_match_clean_sheets - away_match_clean_sheets
+
+    # Shot accuracy difference
+    shot_accuracy_difference = home_shot_accuracy - away_shot_accuracy
+
+    # Conversion rate difference
+    conversion_rate_difference = home_conversion_rate - away_conversion_rate
+
+    # Combined shooting efficiency
+    home_shooting_efficiency = home_shot_accuracy * home_conversion_rate
+    away_shooting_efficiency = away_shot_accuracy * home_conversion_rate
+    shooting_efficiency_difference = home_shooting_efficiency - away_shooting_efficiency
+
+    # Shot volume difference
+    shots_difference = home_match_shots - away_match_shots
+
+    # Shots on target difference
+    shots_on_target_difference = home_match_shots_on_target - away_match_shots_on_target
+
+    # Home defensive pressure
+    home_defensive_pressure = home_match_shots_against - away_match_shots
+
+    # Away defensive pressure
+    away_defensive_pressure = away_match_shots_against - home_match_shots
+
+    # Shots on target against difference
+    shots_on_target_against_difference = home_match_shots_on_target_against - away_match_shots_on_target_against
+
+    # Corner difference 
+    corner_difference = home_match_corners - away_match_corners
+
+    # Corner against difference
+    corner_against_difference = home_match_corners_against - away_match_corners_against
+
+    # Territory control
+    home_territory_control = home_match_corners + home_match_shots
+    away_territory_control = away_match_corners + away_match_shots
+    territory_control_difference = home_territory_control - away_territory_control
+
+    # Foul difference
+    fouls_difference = home_match_fouls - away_match_fouls
+
+    # Yellow card difference
+    yellow_card_difference = home_match_yellow_card - away_match_yellow_card
+
+    # Red card difference
+    red_card_difference = home_match_red_card - away_match_red_card
+
+    # Discipline score (lower is better)
+    home_discipline_score = (home_match_fouls * 0.1) + (home_match_yellow_card * 1) + (home_match_red_card * 3)
+    away_discipline_score = (away_match_fouls * 0.1) + (away_match_yellow_card * 1) + (away_match_red_card * 3)
+    discipline_score_difference = away_discipline_score - home_discipline_score
+
+    # Offside difference
+    offside_difference = home_match_offsides - away_match_offsides
+
+    # Half time goal difference
+    halftime_goals_difference = home_match_halftime_goals - away_match_halftime_goals
+    
+    # Halftime wins difference
+    halftime_wins_difference = home_match_halftime_wins - away_match_halftime_wins
+    
+    # First half strength (halftime wins / total wins)
+    home_first_half_strength = home_match_halftime_wins / home_match_wins if home_match_wins > 0 else 0
+    away_first_half_strength = away_match_halftime_wins / away_match_wins if away_match_wins > 0 else 0
+    first_half_strength_difference = home_first_half_strength - away_first_half_strength
+    
+    # Bet365 probability difference
+    home_bet365_probability = (home_match_bet365_probability_wins + H2H_bet365_hometeam_probability_home + 
+                               H2H_bet365_hometeam_probability_away) / 3
+    away_bet365_probability = (away_match_bet365_probability_wins + H2H_bet365_awayteam_probability_home + 
+                               H2H_bet365_awayteam_probability_away) / 3
+    bet365_probability_difference = home_bet365_probability - away_bet365_probability
+
+    # Draw probability average
+    draw_probability_average = (home_match_bet365_probability_draws + away_match_bet365_probability_draws + 
+                                H2H_bet365_probability_draws) / 3
+    
+    # Market confidence (how decisive are the odds)
+    market_confidence = abs(home_bet365_probability - away_bet365_probability)
+
+    # H2H goal differece impact on form
+    H2H_form_alignment = H2H_goal_diff * momentum_difference
+
+    # H2H average goals vs current defensive form
+    H2H_avg_goals_total = H2H_hometeam_avg_goals + H2H_awayteam_avg_goals
+    current_avg_goals_conceded = (home_match_avg_goals_conceded + away_match_avg_goals_conceded) / 2
+    H2H_goals_vs_defense = H2H_avg_goals_total - current_avg_goals_conceded
+
+    # H2H shooting accuracy vs current form
+    H2H_shot_accuracy_diff = H2H_hometeam_shot_accuracy - H2H_awayteam_shot_accuracy
+    current_shot_accuracy_diff = home_shot_accuracy - away_shot_accuracy
+    shot_accuracy_consitency = abs(H2H_shot_accuracy_diff - current_shot_accuracy_diff)
+
+    # H2H discipline vs current discipline
+    H2H_discipline_diff = (H2H_hometeam_yellow_card + H2H_hometeam_red_card * 3) - (H2H_awayteam_yellow_card + H2H_awayteam_red_card * 3)
+    discipline_consistency = abs(H2H_discipline_diff - discipline_score_difference)
+
+    # Overall attacking threat (goals + shots on target + corners)
+    home_attacking_threat = home_match_fulltime_goals + (home_match_shots_on_target / 10) + (home_match_corners / 10)
+    away_attacking_threat = away_match_fulltime_goals + (away_match_shots_on_target / 10) + (away_match_corners / 10)
+    attacking_threat_differential = home_attacking_threat - away_attacking_threat
+
+    # Overall defensive solidity (clean sheets + limited shots against)
+    home_defensive_solidity = home_match_clean_sheets - (home_match_shots_on_target_against / 10)
+    away_defensive_solidity = away_match_clean_sheets - (away_match_shots_on_target_against / 10)
+    defensive_solidity_differential = home_defensive_solidity - away_defensive_solidity
+   
+    # Balanced team score (attack * defense)
+    home_balance_score = home_attacking_threat * (home_defensive_solidity + 5)  # Add 5 to avoid negative multipliers
+    away_balance_score = away_attacking_threat * (away_defensive_solidity + 5)
+    balance_score_differential = home_balance_score - away_balance_score
+    
+    # Form * efficiency composite
+    home_form_efficiency = home_match_momentum * home_shooting_efficiency * 10
+    away_form_efficiency = away_match_momentum * away_shooting_efficiency * 10
+    form_efficiency_differential = home_form_efficiency - away_form_efficiency
+    
+    # Pressure handling (performance when facing many shots)
+    home_pressure_handling = home_match_goals_conceded / home_match_shots_against if home_match_shots_against > 0 else 0
+    away_pressure_handling = away_match_goals_conceded / away_match_shots_against if away_match_shots_against > 0 else 0
+    pressure_handling_differential = away_pressure_handling - home_pressure_handling  # Lower is better, so reversed
+   
+    # Finishing quality under pressure (conversion when facing defensive pressure)
+    home_finishing_quality = (home_match_fulltime_goals / home_match_shots_on_target) * (1 - (home_match_shots_against / 100)) if home_match_shots_on_target > 0 else 0
+    away_finishing_quality = (away_match_fulltime_goals / away_match_shots_on_target) * (1 - (away_match_shots_against / 100)) if away_match_shots_on_target > 0 else 0
+    finishing_quality_differential = home_finishing_quality - away_finishing_quality
+   
+    # Woodwork luck factor
+    woodwork_differential = home_match_woodwork - away_match_woodwork
+
+    # Style clash indicator (high possession vs counter-attack)
+    home_possession_indicator = (home_match_corners + home_match_shots) / (home_match_fouls + 1)
+    away_possession_indicator = (away_match_corners + away_match_shots) / (away_match_fouls + 1)
+    style_clash_indicator = abs(home_possession_indicator - away_possession_indicator)
+  
+    return [
+        momentum_difference, combined_momentum, form_points_difference, win_rate_difference, 
+        H2H_win_pct_difference, home_attack_vs_away_defense, away_attack_vs_home_defense, 
+        goal_scoring_difference, goals_conceded_difference, shooting_efficiency_difference, 
+        shots_difference, shots_on_target_difference, clean_sheet_difference, shot_accuracy_difference, 
+        conversion_rate_difference, home_defensive_pressure, away_defensive_pressure, 
+        shots_on_target_against_difference, corner_difference, corner_against_difference, 
+        territory_control_difference, fouls_difference, yellow_card_difference, red_card_difference, 
+        offside_difference, halftime_goals_difference, halftime_wins_difference, first_half_strength_difference, 
+        bet365_probability_difference, draw_probability_average, market_confidence, H2H_form_alignment, 
+        H2H_goals_vs_defense, shot_accuracy_consitency, discipline_consistency, attacking_threat_differential, 
+        defensive_solidity_differential, balance_score_differential, form_efficiency_differential, 
+        pressure_handling_differential, finishing_quality_differential, woodwork_differential, 
+        style_clash_indicator
+    ]
+
 def process_data():
     # Training dataset
     X_train = []

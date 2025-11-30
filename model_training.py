@@ -5,8 +5,9 @@ import pickle
 import optuna
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-import xgboost as xgb
-import lightgbm as lgb
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from collections import Counter
@@ -25,8 +26,23 @@ dfs = []
 for file in all_files:
     # Encoding 'ISO-8859-1' because the files werent in UTF-8 which is the standard for Pandas
     df = pd.read_csv(file, on_bad_lines='skip', encoding='ISO-8859-1')
-    # Coerce to convert invalid dates to NaT instead of errors, dayfirst because i cant seem to get the format
-    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, errors='coerce')
+
+    # Parse DD/MM/YY
+    date_2d = pd.to_datetime(
+        df["Date"],
+        format="%d/%m/%y",
+        dayfirst=True,
+        errors="coerce"
+    )
+
+    # Parse DD/MM/YYYY
+    date_4d = pd.to_datetime(
+        df["Date"],
+        format="%d/%m/%Y",
+        dayfirst=True,
+        errors="coerce"
+    )
+    df["Date"] = date_2d.fillna(date_4d)
     dfs.append(df)
 
 all_data = pd.concat(dfs, ignore_index=True)
@@ -36,20 +52,23 @@ all_data = all_data.sort_values(by="Date")
 print(f"Matches loaded: {len(all_data)}")
 
 
-def head2head_training(home_team,away_team, all_data, before_date):
-    # Filter for h2h matches before a certain date
-    h2h_matches = all_data[
-        (((all_data["HomeTeam"] == home_team) & (all_data["AwayTeam"] == away_team)) |
-         ((all_data["HomeTeam"] == away_team) & (all_data["AwayTeam"] == home_team))) &
-        (all_data["Date"] < before_date)]
+def head2head_training(home_team,away_team, all_data_sorted, match_date, current_idx, h2h_matches):
+    pair = tuple(sorted([home_team, away_team]))
 
-    # Sort by the date and get the last 5 
-    last_5 = h2h_matches.sort_values(by="Date").tail(5)
+    if pair not in h2h_matches:
+        return[0] * 42
 
-    if len(last_5) == 0:
-        # Return a zeroed list matching the full feature count
-        return [0] * 42  # Or however many features you always expect
+    # Get matches before current date using the indices
+    h2h_indices = h2h_matches[pair]
+    # Filter for indices before current match and before date
+    valid_indices = [i for i in h2h_indices if i < current_idx and all_data_sorted.loc[i, 'Date'] < match_date]
+
+    if not valid_indices:
+        return[0] * 42
     
+    last_5_indices = valid_indices[-5:] if len(valid_indices) >= 5 else valid_indices 
+    last_5 = all_data_sorted.loc[last_5_indices]
+
     num_matches = len(last_5)
 
     # Shape[0] counts rows passing both filters, shape[1] gives columns and shape gives both
@@ -251,17 +270,22 @@ def head2head_training(home_team,away_team, all_data, before_date):
         H2H_bet365_probability_draws
     ]
 
-def home_matches_training(home_team, all_data, before_date):
-    # Append the matches to the array where the home team is in the column HomeTeam
-    home_matches = all_data[(all_data["HomeTeam"] == home_team) & (all_data["Date"] < before_date)]
+def home_matches_training(home_team, all_data_sorted, match_date, current_idx, team_matches):
+    if home_team not in team_matches:
+        return[0] * 31
 
-    # Sort by the date and get the last 5 
-    last_5 = home_matches.sort_values(by="Date").tail(5)
-
-    if len(last_5) == 0:
-        # Return a zeroed list matching the full feature count
-        return [0] * 31  # Or however many features you always expect
+    # Get home match indices for team
+    home_indices = team_matches[home_team]['home_indices']
+    # Filter for indices before current match and before date
+    valid_indices = [i for i in home_indices if i < current_idx and all_data_sorted.loc[i,'Date'] < match_date]
     
+    if not valid_indices:
+        return[0] * 31
+    
+    # Get last 5 matches
+    last_5_indices = valid_indices[-5:] if len(valid_indices) >= 5 else valid_indices
+    last_5 = all_data_sorted.loc[last_5_indices]
+
     num_matches = len(last_5)
 
     # Match results
@@ -376,16 +400,26 @@ def home_matches_training(home_team, all_data, before_date):
         home_match_bet365_probability_draws
     ]
 
-def away_matches_training(away_team, all_data, before_date):
-    # Append the matches to the array where the away team is in the column AwayTeam
-    away_matches = all_data[(all_data["AwayTeam"] == away_team) & (all_data["Date"] < before_date)]
+def away_matches_training(away_team, all_data_sorted, current_idx, match_date, team_matches):
+    if away_team not in team_matches:
+        return[0] * 31
 
-    # Sort by the date and get the last 5 
-    last_5 = away_matches.sort_values(by="Date").tail(5)
+    # Get home match indices for team
+    away_indices = team_matches[away_team]['away_indices']
 
-    if len(last_5) == 0:
-        # Return a zeroed list matching the full feature count
-        return [0] * 31 # Matching the number of features returned
+    dates = all_data_sorted['Date']
+    # Filter for indices before current match and before date
+    valid_indices = [i for i in away_indices if i < current_idx and all_data_sorted.loc[i,'Date'] < match_date]
+    
+    if not valid_indices:
+        return[0] * 31
+    
+    # Get last 5 matches
+    last_5_indices = valid_indices[-5:] if len(valid_indices) >= 5 else valid_indices
+    last_5 = all_data_sorted.loc[last_5_indices]
+
+    num_matches = len(last_5)
+
     
     num_matches = len(last_5)
 
@@ -734,16 +768,133 @@ def feature_interactions(h2h_stats, home_stats, away_stats):
         style_clash_indicator
     ]
 
+def feature_names():
+    # H2H features (42)
+    h2h_names = [
+        'H2H_hometeam_wins', 'H2H_awayteam_wins', 'H2H_draws',
+        'H2H_hometeam_win_pct', 'H2H_awayteam_win_pct',
+        'H2H_hometeam_halftime_goals', 'H2H_awayteam_halftime_goals',
+        'H2H_hometeam_fulltime_goals', 'H2H_awayteam_fulltime_goals',
+        'H2H_goal_diff', 'H2H_hometeam_avg_goals', 'H2H_awayteam_avg_goals',
+        'H2H_hometeam_goals_conceded', 'H2H_awayteam_goals_conceded',
+        'H2H_hometeam_halftime_wins', 'H2H_awayteam_halftime_wins', 'H2H_halftime_draws',
+        'H2H_hometeam_shots', 'H2H_awayteam_shots',
+        'H2H_hometeam_shots_on_target', 'H2H_awayteam_shots_on_target',
+        'H2H_hometeam_shot_accuracy', 'H2H_awayteam_shot_accuracy',
+        'H2H_hometeam_conversion', 'H2H_awayteam_conversion',
+        'H2H_hometeam_woodwork', 'H2H_awayteam_woodwork',
+        'H2H_hometeam_corners', 'H2H_awayteam_corners',
+        'H2H_hometeam_fouls', 'H2H_awayteam_fouls',
+        'H2H_hometeam_offsides', 'H2H_awayteam_offsides',
+        'H2H_hometeam_yellow_card', 'H2H_awayteam_yellow_card',
+        'H2H_hometeam_red_card', 'H2H_awayteam_red_card',
+        'H2H_bet365_hometeam_probability_home', 'H2H_bet365_hometeam_probability_away',
+        'H2H_bet365_awayteam_probability_home', 'H2H_bet365_awayteam_probability_away',
+        'H2H_bet365_probability_draws'
+    ]
+    
+    # Home match features (31)
+    home_names = [
+        'home_match_wins', 'home_win_rate', 'home_match_losses', 'home_match_draws',
+        'home_match_halftime_goals', 'home_match_fulltime_goals',
+        'home_match_goals_conceded', 'home_match_avg_goals_conceded',
+        'home_match_clean_sheets',
+        'home_match_halftime_wins', 'home_match_halftime_losses', 'home_match_halftime_draws',
+        'home_match_shots', 'home_match_shots_on_target', 'home_shot_accuracy', 'home_conversion_rate',
+        'home_match_shots_against', 'home_match_shots_on_target_against', 'home_match_woodwork_against',
+        'home_match_woodwork', 'home_match_corners', 'home_match_corners_against',
+        'home_match_fouls', 'home_match_offsides',
+        'home_match_yellow_card', 'home_match_red_card',
+        'home_recent_points', 'home_match_momentum',
+        'home_match_bet365_probability_wins', 'home_match_bet365_probability_losses',
+        'home_match_bet365_probability_draws'
+    ]
+    
+    # Away match features (31)
+    away_names = [
+        'away_match_wins', 'away_win_rate', 'away_match_losses', 'away_match_draws',
+        'away_match_halftime_goals', 'away_match_fulltime_goals',
+        'away_match_goals_conceded', 'away_match_avg_goals_conceded',
+        'away_match_clean_sheets',
+        'away_match_halftime_wins', 'away_match_halftime_losses', 'away_match_halftime_draws',
+        'away_match_shots', 'away_match_shots_on_target', 'away_shot_accuracy', 'away_conversion_rate',
+        'away_match_shots_against', 'away_match_shots_on_target_against', 'away_match_woodwork_against',
+        'away_match_woodwork', 'away_match_corners', 'away_match_corners_against',
+        'away_match_fouls', 'away_match_offsides',
+        'away_match_yellow_card', 'away_match_red_card',
+        'away_recent_points', 'away_match_momentum',
+        'away_match_bet365_probability_wins', 'away_match_bet365_probability_losses',
+        'away_match_bet365_probability_draws'
+    ]
+    
+    # Interaction features (43)
+    interaction_names = [
+    'momentum_difference', 'combined_momentum', 'form_points_difference', 
+    'win_rate_difference', 'H2H_win_pct_difference', 
+    'home_attack_vs_away_defense', 'away_attack_vs_home_defense', 
+    'goal_scoring_difference', 'goals_conceded_difference', 
+    'shooting_efficiency_difference', 'shots_difference', 
+    'shots_on_target_difference', 'clean_sheet_difference', 
+    'shot_accuracy_difference', 'conversion_rate_difference', 
+    'home_defensive_pressure', 'away_defensive_pressure', 
+    'shots_on_target_against_difference', 'corner_difference', 
+    'corner_against_difference', 'territory_control_difference', 
+    'fouls_difference', 'yellow_card_difference', 'red_card_difference', 
+    'offside_difference', 'halftime_goals_difference', 
+    'halftime_wins_difference', 'first_half_strength_difference', 
+    'bet365_probability_difference', 'draw_probability_average', 
+    'market_confidence', 'H2H_form_alignment', 'H2H_goals_vs_defense', 
+    'shot_accuracy_consistency', 'discipline_consistency', 
+    'attacking_threat_differential', 'defensive_solidity_differential', 
+    'balance_score_differential', 'form_efficiency_differential', 
+    'pressure_handling_differential', 'finishing_quality_differential', 
+    'woodwork_differential', 'style_clash_indicator'
+]
+    
+    return h2h_names + home_names + away_names + interaction_names
+
+
 def process_data():
+ 
+    all_data['Date'] = pd.to_datetime(all_data['Date'], errors='coerce')
+    all_data_sorted = all_data.sort_values('Date').reset_index(drop=True)
+
+    # Team match indices for faster look up
+    print("Building team match indices")
+    team_matches = {}
+    for team in pd.concat([all_data_sorted['HomeTeam'], all_data_sorted['AwayTeam']]).unique():
+        home_mask = all_data_sorted['HomeTeam'] == team
+        away_mask = all_data_sorted['AwayTeam'] == team
+        team_matches[team] = {
+            'home_indices' : all_data_sorted[home_mask].index.tolist(),
+            'away_indices' : all_data_sorted[away_mask].index.tolist(),
+            'all_indices' : all_data_sorted[home_mask | away_mask].index.tolist() 
+        }
+
+    # H2H match indices
+    print("Building H2H indices")
+    h2h_matches = {}
+    for idx, match in all_data_sorted.iterrows():
+        home_team = match['HomeTeam']
+        away_team = match['AwayTeam']
+        pair = tuple(sorted([home_team, away_team]))
+
+        if pair not in h2h_matches:
+            h2h_mask = (
+                ((all_data_sorted['HomeTeam'] == home_team) & (all_data_sorted['AwayTeam'] == away_team)) |
+                ((all_data_sorted['HomeTeam'] == away_team) & (all_data_sorted['AwayTeam'] == home_team))
+            )
+            h2h_matches[pair] = all_data_sorted[h2h_mask].index.tolist()
+
     # Training dataset
     X_train = []
     y_train = []
 
     # idx = the index row number, match is the actual row data and iterrows() loops through each row in the df
-    for idx, match in all_data.iterrows():
+    for idx, match in all_data_sorted.iterrows():
         # To show that we are processing the data each 100 matches
         if idx % 100 == 0:
-            print(f"Processing match data {idx}/{len(all_data)}")
+            print(f"Processing match data {idx}/{len(all_data_sorted)}")
         
         # Extracting the match data
         home_team = match["HomeTeam"]
@@ -752,19 +903,21 @@ def process_data():
         outcome = match["FTR"]
 
         # Get the features using data before this match
-        h2h_stats = head2head_training(home_team, away_team, all_data, match_date)
-        home_stats = home_matches_training(home_team, all_data, match_date)
-        away_stats = away_matches_training(away_team, all_data, match_date)
+        h2h_stats = head2head_training(home_team, away_team, all_data_sorted, match_date, idx, h2h_matches)
+        home_stats = home_matches_training(home_team, all_data_sorted, match_date, idx, team_matches)
+        away_stats = away_matches_training(away_team, all_data_sorted, idx, match_date, team_matches)
+        feature_interaction = feature_interactions(h2h_stats, home_stats, away_stats)
 
         # Only include matches with historical data
         if sum(h2h_stats) > 0 or sum(home_stats) > 0 or sum(away_stats) > 0:
-            features = h2h_stats + home_stats + away_stats
+            features = h2h_stats + home_stats + away_stats + feature_interaction
             X_train.append(features)
             y_train.append(mapping[outcome])
         
-    # Converting to NumPy arrays
-    X_train = np.array(X_train)
-    y_train = np.array(y_train)
+    # Converting to dataframe with column names
+    column_names = feature_names()
+    X_train = pd.DataFrame(X_train, columns=column_names)
+    y_train = pd.Series(y_train, name='outcome')
 
     print("Training dataset created")
     print("Original class distribution:", Counter(y_train))
@@ -791,44 +944,74 @@ def data_normalization(X_train_split, X_test_split):
 print("Training the model..")
 
 def objective(trial):
-    tree__n_estimators = trial.suggest_int("tree__n_estimators", 50, 500)      # Number of trees
-    tree__max_depth = trial.suggest_int("tree__max_depth", 5, 50)           # Maximum depth of each tree
-    tree__min_samples_split = trial.suggest_int("tree__min_samples_split", 2, 20)   # Minimum number of samples needed to split node
-    tree__min_samples_leaf = trial.suggest_int("tree__min_samples_leaf", 1, 5)     # Minimum number of samples needed at leaf node
+    tree_n_estimators = trial.suggest_int("tree_n_estimators", 50, 500) # Number of trees
+    tree_max_depth = trial.suggest_int("tree_max_depth", 5, 50) # Maximum depth of each tree
+    tree_min_samples_split = trial.suggest_int("tree_min_samples_split", 2, 20) # Minimum number of samples needed to split node
+    tree_min_samples_leaf = trial.suggest_int("tree_min_samples_leaf", 1, 5) # Minimum number of samples needed at leaf node
+
+    xgb_n_estimators = trial.suggest_int("xgb_n_estimators", 50, 200) # Number of boosting rounds
+    xgb_max_depth = trial.suggest_int("xgb_max_depth", 3, 7) # Maximum depth of each tree
+    xgb_learning_rate = trial.suggest_float("xgb_learning_rate", 0.01, 0.2) # Step size shrinkage for update to prevent overfitting
+    xgb_subsample = trial.suggest_float("xgb_subsample", 0.7, 1.0) # Fraction of samples used per tree
+    xgb_colsample_bytree = trial.suggest_float("xgb_colsample_bytree", 0.7, 1.0) # Fraction of features used per tree
     
-    xgb__n_estimators = trial.suggest_int("xgb__n_estimators", 50, 200)      # Number of boosting rounds
-    xgb__max_depth = trial.suggest_int("xgb__max_depth", 3, 7)            # Maximum depth of each tree
-    xgb__learning_rate = trial.suggest_float("xgb__learning_rate", 0.01, 0.2)   # Step size shrinkage for update to prevent overfitting
-    xgb__subsample = trial.suggest_float("xgb__subsample", 0.7, 1.0)          # Fraction of samples used per tree
-    xgb__colsample_bytree = trial.suggest_float("xgb__colsample_bytree", 0.7, 1.0)   # Fraction of features used per tree
+    lgb_n_estimators = trial.suggest_int("lgb_n_estimators", 50, 500) # Number of trees
+    lgb_max_depth = trial.suggest_int("lgb_maxt_depth", 1, 10) # Max depth of each tree
+    lgb_learning_rate = trial.suggest_float("lgb_learning_rate", 0.01, 0.2) # Step size shrinkage for update to prevent overfitting
+    lgb_num_leaves = trial.suggest_int("lgb_num_leaves", 10, 40) # Number of leaf nodes
+    lgb_random_state = trial.suggest_int("lgb_random_state", 1, 50) # Interal randomness factor
+
+    cat_iterations = trial.suggest_int("cat__iterations", 100, 500) # Number of boosting iterations (trees)
+    cat_depth = trial.suggest_int("cat__depth", 3, 8) # Maximum depth of each tree
+    cat_learning_rate = trial.suggest_float("cat__learning_rate", 0.05, 0.1) # Step size for updating the model
+    cat_random_state = trial.suggest_int("cat__random_state", 1, 50) # Internal randomness factor
+
 
     # Instantiate base models with suggested parameters
     tree_clf = RandomForestClassifier(
-        n_estimators=tree__n_estimators,
-        max_depth=tree__max_depth,
-        min_samples_split=tree__min_samples_split,
-        min_samples_leaf=tree__min_samples_leaf,
-        random_state=42,
-        class_weight='balanced'
+        n_estimators = tree_n_estimators,
+        max_depth = tree_max_depth,
+        min_samples_split = tree_min_samples_split,
+        min_samples_leaf = tree_min_samples_leaf,
+        random_state = 42,
+        class_weight = 'balanced'
     )
 
-    xgb_clf = xgb.XGBClassifier(
-        n_estimators=xgb__n_estimators,
-        max_depth=xgb__max_depth,
-        learning_rate=xgb__learning_rate,
-        subsample=xgb__subsample,
-        colsample_bytree=xgb__colsample_bytree,
+    xgb_clf = XGBClassifier(
+        n_estimators = xgb_n_estimators,
+        max_depth = xgb_max_depth,
+        learning_rate = xgb_learning_rate,
+        subsample = xgb_subsample,
+        colsample_bytree = xgb_colsample_bytree,
+    )
+
+    lgb_clf = LGBMClassifier(
+        n_estimators = lgb_n_estimators,
+        max_depth = lgb_max_depth,
+        learning_rate = lgb_learning_rate,
+        num_leaves = lgb_num_leaves,
+        random_state = lgb_random_state,
+    )
+
+    cat_clf = CatBoostClassifier(
+        iterations = cat_iterations,
+        depth = cat_depth,
+        learning_rate = cat_learning_rate,
+        random_state = cat_random_state,
+        verbose = False,
     )
 
     base_models = [
         ('tree', tree_clf),
-        ('xgb', xgb_clf)
+        ('xgb', xgb_clf),
+        ('lgb', lgb_clf),
+        ('cat', cat_clf)
     ]
 
     voting_clf = VotingClassifier(
-        estimators= base_models,
-            voting= 'soft', 
-            n_jobs= -1
+        estimators = base_models,
+            voting = 'soft', 
+            n_jobs = -1
     )
 
     score = cross_val_score(voting_clf, X_train_split, y_train_split, cv=5, scoring="accuracy").mean()
@@ -848,26 +1031,44 @@ def study(X_train_split, y_train_split, X_test_split, y_test_split):
     best_params = study.best_params
 
     tree_clf = RandomForestClassifier(
-        n_estimators=best_params["tree__n_estimators"],
-        max_depth=best_params["tree__max_depth"],
-        min_samples_split=best_params["tree__min_samples_split"],
-        min_samples_leaf=best_params["tree__min_samples_leaf"],
+        n_estimators=best_params["tree_n_estimators"],
+        max_depth=best_params["tree_max_depth"],
+        min_samples_split=best_params["tree_min_samples_split"],
+        min_samples_leaf=best_params["tree_min_samples_leaf"],
         random_state=42,
         class_weight='balanced'
     )
 
-    xgb_clf = xgb.XGBClassifier(
-        n_estimators=best_params["xgb__n_estimators"],
-        max_depth=best_params["xgb__max_depth"],
-        learning_rate=best_params["xgb__learning_rate"],
-        subsample=best_params["xgb__subsample"],
-        colsample_bytree=best_params["xgb__colsample_bytree"],
+    xgb_clf = XGBClassifier(
+        n_estimators=best_params["xgb_n_estimators"],
+        max_depth=best_params["xgb_max_depth"],
+        learning_rate=best_params["xgb_learning_rate"],
+        subsample=best_params["xgb_subsample"],
+        colsample_bytree=best_params["xgb_colsample_bytree"],
+    )
+
+    lgb_clf = LGBMClassifier(
+        n_estimators=best_params["lgb_n_estimators"],
+        max_depth=best_params["lgb_max_depth"],
+        learning_rate=best_params["lgb_learning_rate"],
+        num_leaves=best_params["lgb_num_leaves"],
+        random_state=best_params["lgb_random_state"]
+    )
+
+    cat_clf = CatBoostClassifier(
+        iterations=best_params["cat_iterations"],
+        depth=best_params["cat_depth"],
+        learning_rate=best_params["cat_learning_rate"],
+        random_state=best_params["cat_random_state"],
+        verbose= False
     )
 
     ensemble = VotingClassifier(
         estimators=[
-            ("tree", tree_clf),
-            ("xgb", xgb_clf)
+            ('tree', tree_clf),
+            ('xgb', xgb_clf),
+            ('lgb', lgb_clf),
+            ('cat', cat_clf)
         ],
         voting="soft",
         n_jobs=-1
@@ -884,7 +1085,7 @@ def prediction_model(y_train_split, X_train_scaled, X_test_scaled):
     # Define base models
     base_models = [
         ('tree', RandomForestClassifier(random_state=42, class_weight='balanced')),
-        ('xgb', xgb.XGBClassifier())
+        ('xgb', XGBClassifier())
     ] 
 
     voting_clf = VotingClassifier(

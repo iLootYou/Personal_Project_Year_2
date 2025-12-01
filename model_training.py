@@ -954,12 +954,6 @@ def objective(trial):
     xgb_learning_rate = trial.suggest_float("xgb_learning_rate", 0.01, 0.2) # Step size shrinkage for update to prevent overfitting
     xgb_subsample = trial.suggest_float("xgb_subsample", 0.7, 1.0) # Fraction of samples used per tree
     xgb_colsample_bytree = trial.suggest_float("xgb_colsample_bytree", 0.7, 1.0) # Fraction of features used per tree
-    
-    lgb_n_estimators = trial.suggest_int("lgb_n_estimators", 50, 500) # Number of trees
-    lgb_max_depth = trial.suggest_int("lgb_maxt_depth", 1, 10) # Max depth of each tree
-    lgb_learning_rate = trial.suggest_float("lgb_learning_rate", 0.01, 0.2) # Step size shrinkage for update to prevent overfitting
-    lgb_num_leaves = trial.suggest_int("lgb_num_leaves", 10, 40) # Number of leaf nodes
-    lgb_random_state = trial.suggest_int("lgb_random_state", 1, 50) # Interal randomness factor
 
     cat_iterations = trial.suggest_int("cat__iterations", 100, 500) # Number of boosting iterations (trees)
     cat_depth = trial.suggest_int("cat__depth", 3, 8) # Maximum depth of each tree
@@ -985,14 +979,6 @@ def objective(trial):
         colsample_bytree = xgb_colsample_bytree,
     )
 
-    lgb_clf = LGBMClassifier(
-        n_estimators = lgb_n_estimators,
-        max_depth = lgb_max_depth,
-        learning_rate = lgb_learning_rate,
-        num_leaves = lgb_num_leaves,
-        random_state = lgb_random_state,
-    )
-
     cat_clf = CatBoostClassifier(
         iterations = cat_iterations,
         depth = cat_depth,
@@ -1004,7 +990,6 @@ def objective(trial):
     base_models = [
         ('tree', tree_clf),
         ('xgb', xgb_clf),
-        ('lgb', lgb_clf),
         ('cat', cat_clf)
     ]
 
@@ -1047,14 +1032,6 @@ def study(X_train_split, y_train_split, X_test_split, y_test_split):
         colsample_bytree=best_params["xgb_colsample_bytree"],
     )
 
-    lgb_clf = LGBMClassifier(
-        n_estimators=best_params["lgb_n_estimators"],
-        max_depth=best_params["lgb_max_depth"],
-        learning_rate=best_params["lgb_learning_rate"],
-        num_leaves=best_params["lgb_num_leaves"],
-        random_state=best_params["lgb_random_state"]
-    )
-
     cat_clf = CatBoostClassifier(
         iterations=best_params["cat_iterations"],
         depth=best_params["cat_depth"],
@@ -1067,7 +1044,6 @@ def study(X_train_split, y_train_split, X_test_split, y_test_split):
         estimators=[
             ('tree', tree_clf),
             ('xgb', xgb_clf),
-            ('lgb', lgb_clf),
             ('cat', cat_clf)
         ],
         voting="soft",

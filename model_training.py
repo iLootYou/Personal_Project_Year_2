@@ -4,7 +4,8 @@ import glob
 import pickle
 import optuna
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier, StackingClassifier
+from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
@@ -272,7 +273,7 @@ def head2head_training(home_team,away_team, all_data_sorted, match_date, current
 
 def home_matches_training(home_team, all_data_sorted, match_date, current_idx, team_matches):
     if home_team not in team_matches:
-        return[0] * 31
+        return[0] * 32
 
     # Get home match indices for team
     home_indices = team_matches[home_team]['home_indices']
@@ -280,7 +281,7 @@ def home_matches_training(home_team, all_data_sorted, match_date, current_idx, t
     valid_indices = [i for i in home_indices if i < current_idx and all_data_sorted.loc[i,'Date'] < match_date]
     
     if not valid_indices:
-        return[0] * 31
+        return[0] * 32
     
     # Get last 5 matches
     last_5_indices = valid_indices[-5:] if len(valid_indices) >= 5 else valid_indices
@@ -290,13 +291,15 @@ def home_matches_training(home_team, all_data_sorted, match_date, current_idx, t
 
     # Match results
     home_match_wins = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'H')].shape[0]
-    home_win_rate = home_match_wins / 5  # Last 5 matches
+    home_win_rate = home_match_wins / num_matches
     home_match_losses = last_5[(last_5['HomeTeam'] == home_team) & (last_5['FTR'] == 'A')].shape[0]
     home_match_draws = (last_5['FTR'] == 'D').sum()
 
     # Goals scored
     home_match_halftime_goals = last_5[(last_5['HomeTeam'] == home_team)]['HTHG'].sum()
     home_match_fulltime_goals = last_5[(last_5['HomeTeam'] == home_team)]['FTHG'].sum()
+
+    home_match_goals_per_match = home_match_fulltime_goals / num_matches
 
     # Goals conceded
     home_match_goals_conceded = last_5['FTAG'].sum()
@@ -386,7 +389,7 @@ def home_matches_training(home_team, all_data_sorted, match_date, current_idx, t
     
     return [
         home_match_wins, home_win_rate, home_match_losses, home_match_draws, 
-        home_match_halftime_goals, home_match_fulltime_goals, 
+        home_match_halftime_goals, home_match_fulltime_goals, home_match_goals_per_match,
         home_match_goals_conceded, home_match_avg_goals_conceded,  
         home_match_clean_sheets,  
         home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws, 
@@ -402,7 +405,7 @@ def home_matches_training(home_team, all_data_sorted, match_date, current_idx, t
 
 def away_matches_training(away_team, all_data_sorted, current_idx, match_date, team_matches):
     if away_team not in team_matches:
-        return[0] * 31
+        return[0] * 32
 
     # Get home match indices for team
     away_indices = team_matches[away_team]['away_indices']
@@ -412,15 +415,12 @@ def away_matches_training(away_team, all_data_sorted, current_idx, match_date, t
     valid_indices = [i for i in away_indices if i < current_idx and all_data_sorted.loc[i,'Date'] < match_date]
     
     if not valid_indices:
-        return[0] * 31
+        return[0] * 32
     
     # Get last 5 matches
     last_5_indices = valid_indices[-5:] if len(valid_indices) >= 5 else valid_indices
     last_5 = all_data_sorted.loc[last_5_indices]
 
-    num_matches = len(last_5)
-
-    
     num_matches = len(last_5)
 
     # Match results
@@ -432,6 +432,8 @@ def away_matches_training(away_team, all_data_sorted, current_idx, match_date, t
     # Goals scored
     away_match_halftime_goals = last_5[(last_5['AwayTeam'] == away_team)]['HTAG'].sum()
     away_match_fulltime_goals = last_5[(last_5['AwayTeam'] == away_team)]['FTAG'].sum()
+
+    away_match_goals_per_match = away_match_fulltime_goals / num_matches
 
     # Goals conceded
     away_match_goals_conceded = last_5['FTHG'].sum()
@@ -521,7 +523,7 @@ def away_matches_training(away_team, all_data_sorted, current_idx, match_date, t
     
     return [
         away_match_wins, away_win_rate, away_match_losses, away_match_draws, 
-        away_match_halftime_goals, away_match_fulltime_goals, 
+        away_match_halftime_goals, away_match_fulltime_goals, away_match_goals_per_match,
         away_match_goals_conceded, away_match_avg_goals_conceded, 
         away_match_clean_sheets,
         away_match_halftime_wins, away_match_halftime_losses, away_match_halftime_draws, 
@@ -558,9 +560,9 @@ def feature_interactions(h2h_stats, home_stats, away_stats):
      H2H_bet365_awayteam_probability_home, H2H_bet365_awayteam_probability_away,
      H2H_bet365_probability_draws) = h2h_stats
     
-    # Unpack home_stats (31 features)
+    # Unpack home_stats (32 features)
     (home_match_wins, home_win_rate, home_match_losses, home_match_draws, 
-     home_match_halftime_goals, home_match_fulltime_goals, 
+     home_match_halftime_goals, home_match_fulltime_goals, home_match_goals_per_match,
      home_match_goals_conceded, home_match_avg_goals_conceded,  
      home_match_clean_sheets,  
      home_match_halftime_wins, home_match_halftime_losses, home_match_halftime_draws, 
@@ -573,9 +575,9 @@ def feature_interactions(h2h_stats, home_stats, away_stats):
      home_match_bet365_probability_wins, home_match_bet365_probability_losses, 
      home_match_bet365_probability_draws) = home_stats
     
-    # Unpack away_stats (31 features)
+    # Unpack away_stats (32 features)
     (away_match_wins, away_win_rate, away_match_losses, away_match_draws, 
-     away_match_halftime_goals, away_match_fulltime_goals, 
+     away_match_halftime_goals, away_match_fulltime_goals, away_match_goals_per_match,
      away_match_goals_conceded, away_match_avg_goals_conceded, 
      away_match_clean_sheets,
      away_match_halftime_wins, away_match_halftime_losses, away_match_halftime_draws, 
@@ -768,6 +770,100 @@ def feature_interactions(h2h_stats, home_stats, away_stats):
         style_clash_indicator
     ]
 
+def league_position(team, all_data_sorted, match_date, current_idx, season_start_month=8):
+    current_year = match_date.year
+    current_month = match_date.month
+
+    if current_month >= season_start_month:
+        season_year = current_year
+    else:
+        season_year = current_year - 1
+
+    season_start = pd.Timestamp(year=season_year, month=season_start_month, day=1)
+
+    # Get all matches for this team in the current season before this match
+    team_season_matches = all_data_sorted[
+        ((all_data_sorted['HomeTeam'] == team) | (all_data_sorted['AwayTeam'] == team)) &
+        (all_data_sorted['Date'] >= season_start) &
+        (all_data_sorted['Date'] < match_date) &
+        (all_data_sorted.index < current_idx)
+    ]
+
+    if len(team_season_matches) == 0:
+        return [0] * 10
+
+    points = 0
+    goals_for = 0
+    goals_against = 0
+
+    for _, match in team_season_matches.iterrows():
+        if match['HomeTeam'] == team:
+            goals_for += match['FTHG']
+            goals_against += match['FTAG']
+            if match['FTR'] == 'H':
+                points += 3
+            elif match['FTR'] == 'D':
+                points += 1
+        else:
+            goals_for += match['FTAG']
+            goals_against += match['FTHG']
+            if match['FTR'] == 'A':
+                points += 3
+            elif match['FTR'] == 'D':
+                points += 1
+    
+    matches_played = len(team_season_matches)
+
+    points_per_game = points / matches_played if matches_played > 0 else 0
+    goal_difference = goals_for - goals_against
+    goal_difference_per_game = goal_difference / matches_played if matches_played > 0 else 0
+    goals_for_per_game = goals_for / matches_played if matches_played > 0 else 0
+    goals_against_per_game = goals_against / matches_played if matches_played > 0 else 0
+
+    recent_5 = team_season_matches.tail(5)
+    recent_points = 0
+
+    for _, match in recent_5.iterrows():
+        if match['HomeTeam'] == team:
+            if match['FTR'] == 'H':
+                recent_points += 3
+            elif match['FTR'] == 'D':
+                recent_points += 1
+        else:
+            if match['FTR'] == 'A':
+                recent_points += 3
+            elif match['FTR'] == 'D':
+                recent_points += 1
+
+    recent_points_per_game = recent_points / len(recent_5) if len(recent_5) > 0 else 0 
+
+    form_trajectory = recent_points_per_game - points_per_game 
+
+    wins = 0 
+
+    for _, match in team_season_matches.iterrows():
+        if ((match['HomeTeam'] == team and match['FTR'] == 'H') or 
+           (match['AwayTeam'] == team and match['FTR'] == 'A')):
+            wins += 1
+    
+    win_percentage = wins / matches_played if matches_played > 0 else 0
+
+    estimated_position_score = points_per_game / 2.5 
+
+    return [
+        points,
+        points_per_game,
+        goal_difference,
+        goal_difference_per_game,
+        goals_for_per_game,
+        goals_against_per_game,
+        recent_points_per_game,
+        form_trajectory,
+        win_percentage,
+        estimated_position_score
+    ]
+
+
 def feature_names():
     # H2H features (42)
     h2h_names = [
@@ -793,10 +889,10 @@ def feature_names():
         'H2H_bet365_probability_draws'
     ]
     
-    # Home match features (31)
+    # Home match features (32)
     home_names = [
         'home_match_wins', 'home_win_rate', 'home_match_losses', 'home_match_draws',
-        'home_match_halftime_goals', 'home_match_fulltime_goals',
+        'home_match_halftime_goals', 'home_match_fulltime_goals', 'home_match_goals_per_match',
         'home_match_goals_conceded', 'home_match_avg_goals_conceded',
         'home_match_clean_sheets',
         'home_match_halftime_wins', 'home_match_halftime_losses', 'home_match_halftime_draws',
@@ -810,10 +906,10 @@ def feature_names():
         'home_match_bet365_probability_draws'
     ]
     
-    # Away match features (31)
+    # Away match features (32)
     away_names = [
         'away_match_wins', 'away_win_rate', 'away_match_losses', 'away_match_draws',
-        'away_match_halftime_goals', 'away_match_fulltime_goals',
+        'away_match_halftime_goals', 'away_match_fulltime_goals', 'away_match_goals_per_match',
         'away_match_goals_conceded', 'away_match_avg_goals_conceded',
         'away_match_clean_sheets',
         'away_match_halftime_wins', 'away_match_halftime_losses', 'away_match_halftime_draws',
@@ -829,29 +925,43 @@ def feature_names():
     
     # Interaction features (43)
     interaction_names = [
-    'momentum_difference', 'combined_momentum', 'form_points_difference', 
-    'win_rate_difference', 'H2H_win_pct_difference', 
-    'home_attack_vs_away_defense', 'away_attack_vs_home_defense', 
-    'goal_scoring_difference', 'goals_conceded_difference', 
-    'shooting_efficiency_difference', 'shots_difference', 
-    'shots_on_target_difference', 'clean_sheet_difference', 
-    'shot_accuracy_difference', 'conversion_rate_difference', 
-    'home_defensive_pressure', 'away_defensive_pressure', 
-    'shots_on_target_against_difference', 'corner_difference', 
-    'corner_against_difference', 'territory_control_difference', 
-    'fouls_difference', 'yellow_card_difference', 'red_card_difference', 
-    'offside_difference', 'halftime_goals_difference', 
-    'halftime_wins_difference', 'first_half_strength_difference', 
-    'bet365_probability_difference', 'draw_probability_average', 
-    'market_confidence', 'H2H_form_alignment', 'H2H_goals_vs_defense', 
-    'shot_accuracy_consistency', 'discipline_consistency', 
-    'attacking_threat_differential', 'defensive_solidity_differential', 
-    'balance_score_differential', 'form_efficiency_differential', 
-    'pressure_handling_differential', 'finishing_quality_differential', 
-    'woodwork_differential', 'style_clash_indicator'
-]
+        'momentum_difference', 'combined_momentum', 'form_points_difference', 
+        'win_rate_difference', 'H2H_win_pct_difference', 
+        'home_attack_vs_away_defense', 'away_attack_vs_home_defense', 
+        'goal_scoring_difference', 'goals_conceded_difference', 
+        'shooting_efficiency_difference', 'shots_difference', 
+        'shots_on_target_difference', 'clean_sheet_difference', 
+        'shot_accuracy_difference', 'conversion_rate_difference', 
+        'home_defensive_pressure', 'away_defensive_pressure', 
+        'shots_on_target_against_difference', 'corner_difference', 
+        'corner_against_difference', 'territory_control_difference', 
+        'fouls_difference', 'yellow_card_difference', 'red_card_difference', 
+        'offside_difference', 'halftime_goals_difference', 
+        'halftime_wins_difference', 'first_half_strength_difference', 
+        'bet365_probability_difference', 'draw_probability_average', 
+        'market_confidence', 'H2H_form_alignment', 'H2H_goals_vs_defense', 
+        'shot_accuracy_consistency', 'discipline_consistency', 
+        'attacking_threat_differential', 'defensive_solidity_differential', 
+        'balance_score_differential', 'form_efficiency_differential', 
+        'pressure_handling_differential', 'finishing_quality_differential', 
+        'woodwork_differential', 'style_clash_indicator'
+    ]
+
+    # League features (10)
+    league_position_names = [
+        'points',
+        'points_per_game',
+        'goal_difference',
+        'goal_difference_per_game',
+        'goals_for_per_game',
+        'goals_against_per_game',
+        'recent_points_per_game',
+        'form_trajectory',
+        'win_percentage',
+        'estimated_position_score'
+    ]
     
-    return h2h_names + home_names + away_names + interaction_names
+    return h2h_names + home_names + away_names + interaction_names + league_position_names
 
 
 def process_data():
@@ -907,10 +1017,11 @@ def process_data():
         home_stats = home_matches_training(home_team, all_data_sorted, match_date, idx, team_matches)
         away_stats = away_matches_training(away_team, all_data_sorted, idx, match_date, team_matches)
         feature_interaction = feature_interactions(h2h_stats, home_stats, away_stats)
+        league_stats = league_position(team, all_data_sorted, match_date, idx, season_start_month=8)
 
         # Only include matches with historical data
         if sum(h2h_stats) > 0 or sum(home_stats) > 0 or sum(away_stats) > 0:
-            features = h2h_stats + home_stats + away_stats + feature_interaction
+            features = h2h_stats + home_stats + away_stats + feature_interaction + league_stats
             X_train.append(features)
             y_train.append(mapping[outcome])
         
@@ -993,13 +1104,19 @@ def objective(trial):
         ('cat', cat_clf)
     ]
 
-    voting_clf = VotingClassifier(
-        estimators = base_models,
-            voting = 'soft', 
-            n_jobs = -1
+    #voting_clf = VotingClassifier(
+    #    estimators = base_models,
+    #        voting = 'soft', 
+    #        n_jobs = -1
+    #)
+
+    stacking = StackingClassifier(
+        estimators= base_models,
+        final_estimator= LogisticRegression(),
+        n_jobs = -1
     )
 
-    score = cross_val_score(voting_clf, X_train_split, y_train_split, cv=5, scoring="accuracy").mean()
+    score = cross_val_score(stacking, X_train_split, y_train_split, cv=5, scoring="accuracy").mean()
     return score
 
 def study(X_train_split, y_train_split, X_test_split, y_test_split):
@@ -1040,13 +1157,12 @@ def study(X_train_split, y_train_split, X_test_split, y_test_split):
         verbose= False
     )
 
-    ensemble = VotingClassifier(
+    ensemble = StackingClassifier(
         estimators=[
             ('tree', tree_clf),
             ('xgb', xgb_clf),
             ('cat', cat_clf)
         ],
-        voting="soft",
         n_jobs=-1
     )
 

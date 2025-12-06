@@ -1119,7 +1119,7 @@ def objective(trial):
     score = cross_val_score(stacking, X_train_split, y_train_split, cv=5, scoring="accuracy").mean()
     return score
 
-def study(X_train_split, y_train_split, X_test_split, y_test_split):
+def study(X_train_selected, y_train_split, X_test_split, y_test_split):
     study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=50)
 
@@ -1167,11 +1167,37 @@ def study(X_train_split, y_train_split, X_test_split, y_test_split):
     )
 
     # Fit ensemble with training data
-    ensemble.fit(X_train_split, y_train_split)
+    ensemble.fit(X_train_selected, y_train_split)
 
     # Predict
     y_pred = ensemble.predict(X_test_split)
     print(f"Test Accuracy: {accuracy_score(y_test_split, y_pred):.4f}")
+
+def select_top_features(X_train_split, y_train_split, top_k=80):
+    # Select most important features to reduce noise
+
+    feature_names_list = feature_names()
+
+    clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    clf.fit(X_train_split, y_train_split)
+
+    importances = clf.feature_importances_
+    feature_importance_df = pd.DataFrame({
+        'feature' : feature_names_list,
+        'importance': importances
+    }).sort_values('importance', ascending=False)
+
+    print("\nTop 20 Most Important Features:")
+    print(feature_importance_df.head(20))
+
+    top_features = feature_importance_df.head(top_k)['feature'].tolist()
+    top_feature_indices = [feature_names_list.index(f) for f in top_features]
+
+    X_train_selected = X_train_split.iloc[:, top_feature_indices]
+    
+    print(f"\nReduced features from {len(feature_names_list)} to {top_k}")
+    
+    return X_train_selected, top_feature_indices, top_features
 
 def prediction_model(y_train_split, X_train_scaled, X_test_scaled):
     # Define base models
@@ -1246,7 +1272,8 @@ def data_visualization(best_model, y_pred, X_test_scaled, y_test_split):
 if __name__ == "__main__":
     X_train_split, X_test_split, y_train_split, y_test_split = process_data()
     X_train_scaled, X_test_scaled = data_normalization(X_train_split, X_test_split)
-    study(X_train_split, y_train_split, X_test_split, y_test_split)
+    X_train_selected = select_top_features(X_train_split, y_train_split, top_k=80)
+    study(X_train_selected, y_train_split, X_test_split, y_test_split)
     #best_model, y_pred = prediction_model(y_train_split, X_train_scaled, X_test_scaled)
     #data_visualization(best_model, y_pred, X_test_scaled, y_test_split)
 

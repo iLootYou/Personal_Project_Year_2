@@ -1,0 +1,13 @@
+title {
+    font-size: 24px;
+    font-weight: bold;
+    color: green;
+    margin-bottom: 20px;
+}
+button{
+    background-color: green;
+    font-size: 16px;
+    border-radius: 5px;
+    padding: 10px 20px;
+    color: white;
+}

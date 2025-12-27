@@ -1037,3 +1037,7 @@ def data_normalization(X_train_split, X_test_split):
     X_test_scaled = scaler.transform(X_test_split)
 
     return X_train_scaled, X_test_scaled
+
+# fit_transform on the train data to calculate the parameters and immediately apply the transformation
+# To avoid data leakage we dont fit the test data but just apply the transformation, otherwise it would recalculate
+# Now we ensure that the test data is scaled consistently.

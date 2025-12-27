@@ -1,13 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Match predictor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Welcome to the Match Predictor</h1>
-    <form action="/webapp/app.py" method="post">
-        <label for="Home team">Home team:</label>
-        <input type="text" id="Home team" name="Home team" required><br><br>
-        <label for="Away team">Away team:</label>
-        <input type="text" id="Away team" name="Away team" required><br><br>
-        <input type="submit" value="Predict Match Outcome">
-        <button type="button">Confirm Prediction</button>
-    </form>
+    <div class="container">
+        <h1>Welcome to the Match Predictor</h1>
+
+        <div class="form-card">
+            <form method="post">
+                <div class="form-row">
+                    <label for="home_team">Home team:</label>
+                    <input type="text" id="home_team" name="home_team">
+                </div>
+                <div class="form-row">
+                    <label for="away_team">Away team:</label>
+                    <input type="text" id="away_team" name="away_team">
+                </div>
+                <button type="submit">Predict Match Outcome</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,29 +1,37 @@
 import pandas as pd
-import numpy as np
-import glob
 import pickle
+import requests 
+import os
 import optuna
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV, cross_val_score
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier, StackingClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.model_selection import cross_val_score
 from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
-from sklearn.utils.class_weight import compute_class_weight
-from collections import Counter
-from scipy.stats import randint, uniform
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline
+import webapp.fe.feature_engineering as fe
 
-import feature_engineering as fe
+url = "https://www.football-data.co.uk/mmz4281/2526/E0.csv"
+response = requests.get(url)
+folder = "webapp/data/"
+file = "Prem25-26.csv"
 
-# Training the model
-print("Training the model..")
+# Full path to where the file will be saved
+file_path = os.path.join(folder, file)
+
+
+def current_season_update():
+    # "wb" for write mode and binary mode so we can write raw bytes which is essential when downloading
+    # from web request
+    if response.status_code == 200:
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+        print(f"Download successful to {file_path}")
+    else:
+        print("Failed to download file")
 
 
 def select_top_features(X_train_split, y_train_split, X_test_split, top_k=80):
@@ -217,10 +225,12 @@ def data_visualization(best_model, y_pred, X_test_selected, y_test_split):
 
 # Usage:
 if __name__ == "__main__":
+    # Update current season dataset
+    current_season_update()
+
     # Process your data (your existing function)
     all_data = fe.data_frame()
     X_train_split, X_test_split, y_train_split, y_test_split = fe.process_data(all_data)
-    #X_train_scaled, X_test_scaled = fe.data_normalization(X_train_split, X_test_split)
     
     print(f"Train set shape: {X_train_split.shape}")
     print(f"Test set shape: {X_test_split.shape}")

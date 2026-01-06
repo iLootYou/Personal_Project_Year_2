@@ -34,9 +34,11 @@ A Flask web application that predicts Premier League match outcomes using machin
 ### Requirements
 Make sure you have the following software installed:
 
-Python 3.11 or higher
-Docker (optional, but recommended)
-Git
+* Python 3.11 or higher
+
+* Docker (optional, but recommended)
+
+* Git
 
 ### Installation without Docker
 1. Clone the Repository

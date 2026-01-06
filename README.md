@@ -24,11 +24,11 @@ A Flask web application that predicts Premier League match outcomes using machin
 * Frontend: HTML/CSS, responsive design
 
 ## Model Accuracy
-Test Accuracy: ~53% 
+* Test Accuracy: ~53% 
 
-Ensemble voting: Combines 3 models for robustness
+* Ensemble voting: Combines 3 models for robustness
 
-Features: 80 top-ranked (H2H, form, league position)
+* Features: 80 top-ranked (H2H, form, league position)
 
 ## How to test and use
 ### Requirements

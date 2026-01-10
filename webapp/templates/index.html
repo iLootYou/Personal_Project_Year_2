@@ -47,6 +47,16 @@
                         {{ proba_away }}
                     </div>
                 </div>
-    {% endif %}
+
+                {% if h2h_table %}
+                    <div class="h2h">
+                        <strong>Head-to-Head</strong><br>
+                        {{ h2h_table }}
+                        {% if h2h_stats %}
+                            <p>{{ h2h_stats }}</p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
 </body>
 </html>

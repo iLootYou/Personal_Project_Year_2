@@ -196,3 +196,80 @@ input[type="submit"]:active {
     border-left: 5px solid #ef4444;
     margin-bottom: 20px;
 }
+
+/* Head-to-Head Section */
+.h2h {
+    background: rgba(26, 26, 26, 0.9);
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #4ade80;
+    overflow-x: auto;
+    margin-top: 40px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.h2h strong {
+    display: block;
+    color: #66bb6a;
+    font-size: 1.3em;
+    margin-bottom: 20px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    font-weight: 800;
+}
+
+.h2h table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    background: #1a1a1a;
+}
+
+.h2h table thead {
+    background: linear-gradient(135deg, #00b300, #00cc00);
+    color: #1a1a1a;
+}
+
+.h2h table th {
+    padding: 14px;
+    text-align: left;
+    font-weight: 700;
+    border: 1px solid #4ade80;
+}
+
+.h2h table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #333;
+    color: #e8f5e9;
+    border-right: 1px solid #333;
+}
+
+.h2h table td:last-child {
+    border-right: none;
+}
+
+.h2h table tbody tr:hover {
+    background: #2a2a2a;
+    transition: background 0.3s ease;
+}
+
+.h2h table tbody tr:nth-child(even) {
+    background: #1a1a1a;
+}
+
+.h2h table tbody tr:nth-child(odd) {
+    background: #222;
+}
+
+.h2h p {
+    color: #4ade80;
+    line-height: 1.8;
+    font-size: 1.1em;
+    margin: 15px 0 0 0;
+    padding: 15px;
+    background: rgba(74, 222, 128, 0.1);
+    border-left: 4px solid #4ade80;
+    border-radius: 6px;
+    font-weight: 600;
+}

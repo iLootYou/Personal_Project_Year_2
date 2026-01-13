@@ -43,13 +43,13 @@ Make sure you have the following software installed:
 ### Installation without Docker
 1. Clone the Repository
 
-    git clone https://github.com/iLootYou/Personal_Project_Year_2.git
+        git clone https://github.com/iLootYou/Personal_Project_Year_2.git
    
-    cd Personal_Project_Year_2
+        cd Personal_Project_Year_2
    
 2. Create a Virtual Environment
    
-   python -m venv venv
+       python -m venv venv
 
    #### On Windows:
    
@@ -61,13 +61,13 @@ Make sure you have the following software installed:
 
 3. Install Dependencies
    
-   pip install -r requirements.txt
+       pip install -r requirements.txt
 
 4. Download the Data
 The project automatically fetches the most recent Premier League data from the current season 25-26 from football-data.co.uk. This happens when you start the application via the current_season_update() function.
 5. Start the Webapp
    
-   python app.py
+       python app.py
    
 The application is now available at: http://localhost:5000
 
@@ -83,17 +83,17 @@ View the predicted result and probabilities
 ### Installation with Docker
 1. Clone the Repository
    
-  git clone https://github.com/iLootYou/Personal_Project_Year_2.git
+      git clone https://github.com/iLootYou/Personal_Project_Year_2.git
   
-  cd Personal_Project_Year_2
+      cd Personal_Project_Year_2
 
 2. Build the Docker Image
    
-  docker build -t match-predictor .
+      docker build -t match-predictor .
 
 3. Run the Container
    
-   docker run -p 5000:5000 match-predictor
+       docker run -p 5000:5000 match-predictor
 
 The application is now available at: http://localhost:5000
 
@@ -102,14 +102,14 @@ The application is now available at: http://localhost:5000
     Personal_Project_Year_2/ 
     Webapp
     ├── data/ │ 
-        └── Prem00-26.csv # Premier League 
+    │   └── Prem00-26.csv # Premier League 
     ├── fe/ │ 
-        ├── __init__.py # Empty file used for paths
-        └── feature_engineering.py # Feature engineering 
+    │   ├── __init__.py # Empty file used for paths
+    │   └── feature_engineering.py # Feature engineering 
     ├──static/ 
-        └── style.css # CSS styling
+    │   └── style.css # CSS styling
     ├──templates/ 
-        └── index.html # HTML template 
+    │   └── index.html # HTML template 
     ├── app.py # Flask applicatie 
     ├── Dockerfile # Docker configuratie 
     ├── match_predictor.pkl # Getraind ensemble 
@@ -123,7 +123,7 @@ The application is now available at: http://localhost:5000
 
 If you want to retrain the model with your own data:
 
-python train_model.py
+    python train_model.py
 
 This will:
 

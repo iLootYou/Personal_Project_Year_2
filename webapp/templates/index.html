@@ -51,7 +51,7 @@
                 {% if h2h_table %}
                     <div class="h2h">
                         <strong>Head-to-Head</strong><br>
-                        {{ h2h_table }}
+                        {{ h2h_table | safe }}
                         {% if h2h_stats %}
                             <p>{{ h2h_stats }}</p>
                         {% endif %}

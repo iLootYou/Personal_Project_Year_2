@@ -143,6 +143,10 @@ def predict():
     if hometeam == awayteam:
         return render_template('index.html', error="Teams must be different"), 400
     
+    if (hometeam not in all_data['HomeTeam'].values and hometeam not in all_data['AwayTeam'].values) or \
+    (awayteam not in all_data['HomeTeam'].values and awayteam not in all_data['AwayTeam'].values):
+        return render_template('index.html', error="One or both teams not found in database"), 400
+
     try:
         X = build_features_for_match(hometeam, awayteam)
         pred_class = model.predict(X)[0]

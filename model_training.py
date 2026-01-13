@@ -7,7 +7,8 @@ from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.model_selection import cross_val_score
 from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
+from sklearn.preprocessing import label_binarize
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -60,7 +61,7 @@ def select_top_features(X_train_split, y_train_split, X_test_split, top_k=80):
    
     print(f"\nReduced features from {len(feature_names_list)} to {top_k}")
    
-    return X_train_selected, X_test_selected, top_features
+    return X_train_selected, X_test_selected, top_features, feature_importance_df
 
 
 def objective(trial, X_train_selected, y_train_split):
@@ -195,7 +196,10 @@ def optimize_ensemble(X_train_selected, y_train_split, X_test_selected, y_test_s
     test_accuracy = accuracy_score(y_test_split, y_pred)
     print(f"Test Accuracy: {test_accuracy:.4f}\n")
 
-    return ensemble, study
+    # Ensemble probabilities for visualization
+    ensemble_proba = ensemble.predict_proba(X_test_selected)
+
+    return ensemble, study, ensemble_proba
 
 
 def data_visualization(best_model, y_pred, X_test_selected, y_test_split):
@@ -222,11 +226,106 @@ def data_visualization(best_model, y_pred, X_test_selected, y_test_split):
     plt.title("Confusion Matrix")
     plt.show()
 
+def bar_graph(all_data):
+    outcomes = all_data['FTR'].value_counts()
 
+    total_matches = len(all_data)
+    home_win_pct = (outcomes.get('H', 0) / total_matches) * 100
+    draw_pct = (outcomes.get('D', 0) / total_matches) * 100
+    away_win_pct = (outcomes.get('A', 0) / total_matches) * 100
+
+    # Data for the chart
+    categories = ['Home wins', 'Draws', 'Away wins']
+    percentages = [home_win_pct, draw_pct, away_win_pct]
+    counts = [outcomes.get('H', 0), outcomes.get('D', 0), outcomes.get('A', 0)]
+    colors = ['#4ade80', '#eab308', '#ef4444']  # Green, Yellow, Red
+
+    # Create the bar chart
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bars = ax.bar(categories, percentages,
+                  color=colors,
+                  edgecolor='white',
+                  linewidth=2,
+                  alpha=0.85)
+    ax.set_title('Premier League Match Outcome Distribution', fontsize=16, fontweight='bold', pad=20)
+    ax.set_ylabel('Percentage (%)', fontsize=12, fontweight='bold')
+    ax.set_ylim(0, 100)
+
+    for bar, pct, count in zip(bars, percentages, counts):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                f'{pct:.1f}%\n{count}',
+                ha='center', va='bottom', fontweight='bold', fontsize=11)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    plt.show()
+
+def feature_importance_graph(feature_df, top_n=20):
+  # Get top n features
+    top_features = feature_df.head(top_n).sort_values('importance', ascending=True)
+    
+    # Create horizontal bar chart (easier to read feature names)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    bars = ax.barh(top_features['feature'], top_features['importance'], 
+                   color='#3b82f6', alpha=0.8, edgecolor='white', linewidth=1.5)
+    
+    # Customize
+    ax.set_xlabel('Importance Score', fontsize=12, fontweight='bold')
+    ax.set_title('Top 20 Most Important Features for Football Outcome Prediction', 
+                 fontsize=14, fontweight='bold', pad=20)
+    
+    # Add value labels on bars
+    for bar in bars:
+        width = bar.get_width()
+        percentage = width * 100
+        ax.text(width, bar.get_y() + bar.get_height()/2, 
+                f' {percentage:.2f}%', 
+                va='center', ha='left', fontsize=9, fontweight='bold')
+    
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    plt.show()
+
+def roc_curve_graph(y_test_split, ensemble_proba, class_names=['Home Win', 'Draw', 'Away Win']):
+    # Binairize the output for one vs rest approach
+    y_test_bin = label_binarize(y_test_split, classes=[0,1,2])
+
+    # Create the figure
+    fig, ax = plt.subplots(figsize=(10,8))
+
+    # Colors for each class
+    colors = ['#4ade80', '#eab308', '#ef4444']  # Green, Yellow, Red
+
+    for i, (class_names, color) in enumerate(zip(class_names, colors)):
+        # Get labels and probabilities for this class
+        y_class = y_test_bin[:, i]
+        y_pred = ensemble_proba[:, i]
+
+        # Calculate ROC Curve
+        fpr, tpr, thresholds = roc_curve(y_class, y_pred)
+        roc_auc = auc(fpr, tpr)
+
+        # Plot ROC Curve
+        ax.plot(fpr, tpr, color=color, lw=2.5, label=f'{class_names} ( AUC = {roc_auc:.3f})')
+
+    # Plot AUC Area Under Curve
+    ax.plot([0,1], [0,1], 'k--', lw=2, label="Random Classifier (AUC = 0.500)")
+
+    # Customize plot
+    ax.set_xlabel("False Positive Rate", fontsize=12, fontweight='bold')
+    ax.set_ylabel("True Positive Rate", fontsize=12, fontweight='bold')
+    ax.set_title("ROC Curve One vs Rest Classification", fontsize=14, fontweight='bold')
+    ax.legend(loc='lower right', fontsize=11, framealpha=0.95)
+    ax.grid(alpha=0.3, linestyle='--')
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+
+    plt.tight_layout()
+    plt.show()
 # Usage:
 if __name__ == "__main__":
     # Update current season dataset
-    current_season_update()
+    # current_season_update()
 
     # Process your data (your existing function)
     all_data = fe.data_frame()
@@ -236,33 +335,36 @@ if __name__ == "__main__":
     print(f"Test set shape: {X_test_split.shape}")
     print(f"Unique classes in y_train: {y_train_split.unique()}")
     
-    # Select top features from training data, apply to both
-    X_train_selected, X_test_selected, top_features = select_top_features(
+    # # Select top features from training data, apply to both
+    X_train_selected, X_test_selected, top_features, feature_importance_df = select_top_features(
         X_train_split, y_train_split, X_test_split, top_k=80
     )
 
-    # Save top features
-    with open('top_features.pkl', 'wb') as f:
-        pickle.dump(top_features, f)
+    # # Save top features
+    # with open('top_features.pkl', 'wb') as f:
+    #     pickle.dump(top_features, f)
 
-    print("Top features saved as 'top_features.pkl'")
+    # print("Top features saved as 'top_features.pkl'")
     
     print(f"Selected train shape: {X_train_selected.shape}")
     print(f"Selected test shape: {X_test_selected.shape}")
     
     #Run optimization
-    best_model, optuna_study = optimize_ensemble(
+    best_model, optuna_study, ensemble_proba = optimize_ensemble(
         X_train_selected, y_train_split, X_test_selected, y_test_split
     )
     
     #Get predictions for visualization
     y_pred = best_model.predict(X_test_selected)
     
-    #Visualize results
+    # #Visualize results
     data_visualization(best_model, y_pred, X_test_selected, y_test_split)
+    #bar_graph(all_data)
+    #feature_importance_graph(feature_importance_df, top_n=20)
+    roc_curve_graph(y_test_split, ensemble_proba, class_names=['Home Win', 'Draw', 'Away Win'])
     
-    #Save the model
-    with open('match_predictor.pkl', 'wb') as f:
-        pickle.dump(best_model, f)
+    # #Save the model
+    # with open('match_predictor.pkl', 'wb') as f:
+    #     pickle.dump(best_model, f)
     
-    print("Model saved as 'match_predictor.pkl'")
+    # print("Model saved as 'match_predictor.pkl'")

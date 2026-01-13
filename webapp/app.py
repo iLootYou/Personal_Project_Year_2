@@ -2,6 +2,7 @@ from flask import Flask, render_template, request
 import pickle
 import pandas as pd
 import sys
+import glob
 from pathlib import Path
 
 # Project root to path
@@ -85,6 +86,48 @@ def build_features_for_match(hometeam, awayteam):
 
     return X_selected
 
+def H2H(hometeam, awayteam):
+    """Get head-to-head stats between two teams"""
+    
+    # Filter matches where these two teams played each other
+    h2h_matches = all_data[
+        ((all_data['HomeTeam'] == hometeam) & (all_data['AwayTeam'] == awayteam)) |
+        ((all_data['HomeTeam'] == awayteam) & (all_data['AwayTeam'] == hometeam))
+    ].copy()
+    
+    # Return empty if no matches found
+    if len(h2h_matches) == 0:
+        return pd.DataFrame(), [0, 0, 0]
+    
+    # Convert dates properly
+    h2h_matches["Date"] = pd.to_datetime(h2h_matches["Date"], dayfirst=True, errors='coerce')
+    
+    # Sort by date and get the last 5 matches
+    last_5 = h2h_matches.sort_values(by="Date", ascending=False).head(5).sort_values(by="Date")
+    
+    # Select columns to display
+    subset = ['Date', 'HomeTeam', 'AwayTeam', 'FTR']
+    display_table = last_5[subset]
+    display_table = display_table.rename(columns={'FTR': 'Outcome'})
+
+    outcome_map = {'H': 'Home', 'D': 'Draw', 'A': 'Away'}
+    display_table['Outcome'] = display_table['Outcome'].map(outcome_map)
+    
+    # Calculate stats
+    H2H_hometeam_wins_home = last_5[(last_5['HomeTeam'] == hometeam) & (last_5['FTR'] == 'H')].shape[0]
+    H2H_hometeam_wins_away = last_5[(last_5['AwayTeam'] == hometeam) & (last_5['FTR'] == 'A')].shape[0]
+    H2H_hometeam_wins = H2H_hometeam_wins_home + H2H_hometeam_wins_away
+    
+    H2H_awayteam_wins_home = last_5[(last_5['HomeTeam'] == awayteam) & (last_5['FTR'] == 'H')].shape[0]
+    H2H_awayteam_wins_away = last_5[(last_5['AwayTeam'] == awayteam) & (last_5['FTR'] == 'A')].shape[0]
+    H2H_awayteam_wins = H2H_awayteam_wins_home + H2H_awayteam_wins_away
+    
+    H2H_draws = (last_5['FTR'] == 'D').sum()
+    
+    stats_text = f"{hometeam}: {H2H_hometeam_wins} wins | Draws: {H2H_draws} | {awayteam}: {H2H_awayteam_wins} wins"
+    
+    return display_table, stats_text
+
 @app.route("/", methods=["GET"])
 def home():
     return render_template('index.html')
@@ -97,6 +140,9 @@ def predict():
     if not hometeam or not awayteam:
         return render_template('index.html', error="Please enter both teams"), 400
     
+    if hometeam == awayteam:
+        return render_template('index.html', error="Teams must be different"), 400
+    
     try:
         X = build_features_for_match(hometeam, awayteam)
         pred_class = model.predict(X)[0]
@@ -106,6 +152,9 @@ def predict():
         prediction = label_map[pred_class]
         css_class = {0: "home-win", 1: "draw", 2: "away-win"}[pred_class]
 
+        # Get H2H data
+        h2h_table, h2h_stats = H2H(hometeam, awayteam)
+
         return render_template('index.html',
                                prediction=prediction,
                                css_class=css_class,
@@ -113,7 +162,9 @@ def predict():
                                awayteam=awayteam,
                                proba_home=f"{pred_proba[0]:.1%}",
                                proba_draw=f"{pred_proba[1]:.1%}",
-                               proba_away=f"{pred_proba[2]:.1%}"
+                               proba_away=f"{pred_proba[2]:.1%}",
+                               h2h_table=h2h_table.to_html(classes='table table-striped', index=False),
+                               h2h_stats=h2h_stats
         )
     
     except Exception as e:

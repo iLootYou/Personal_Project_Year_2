@@ -24,13 +24,13 @@ with open('top_features.pkl', 'rb') as f:
 
 # Load ALL historical data
 print("Loading historical data for feature engineering...")
-all_data = fe.data_frame()  # Same as your training!
+all_data = fe.data_frame() 
 print(f"Loaded {len(all_data)} historical matches")
 
 app.jinja_env.globals['all_data'] = all_data # Make it available to functions
 
 def build_features_for_match(hometeam, awayteam):
-    # Get the last date in your dataset as "current date"
+    # Get the last date in dataset as "current date"
     latest_date = all_data['Date'].max()
 
     # Find indices for this hypothetical future match
@@ -69,8 +69,8 @@ def build_features_for_match(hometeam, awayteam):
     away_stats = fe.away_matches_training(awayteam, all_data, mock_idx, latest_date, team_matches)
     feature_interaction = fe.feature_interactions(h2h_stats, home_stats, away_stats)
     
-    # League stats - fix 'team' variable (you had undefined 'team')
-    league_stats = fe.league_position(hometeam, all_data, latest_date, mock_idx)  # Use hometeam
+    # League stats
+    league_stats = fe.league_position(hometeam, all_data, latest_date, mock_idx)
     
     # Combine ALL features
     all_features = h2h_stats + home_stats + away_stats + feature_interaction + league_stats
@@ -143,6 +143,10 @@ def predict():
     if hometeam == awayteam:
         return render_template('index.html', error="Teams must be different"), 400
     
+    if (hometeam not in all_data['HomeTeam'].values and hometeam not in all_data['AwayTeam'].values) or \
+    (awayteam not in all_data['HomeTeam'].values and awayteam not in all_data['AwayTeam'].values):
+        return render_template('index.html', error="One or both teams not found in database"), 400
+
     try:
         X = build_features_for_match(hometeam, awayteam)
         pred_class = model.predict(X)[0]

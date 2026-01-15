@@ -129,7 +129,7 @@ This will:
 
 * Load and preprocess the data
 
-* Perform feature engineering
+* Select top features
 
 * Train the ensemble model
 
